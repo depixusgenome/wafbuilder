@@ -1,0 +1,8 @@
+*__pycache__/
+.lock-*
+.waf*
+.*.un~
+build/
+wafbuilder/
+waf
+pyenv/
