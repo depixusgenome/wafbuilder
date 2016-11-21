@@ -230,7 +230,7 @@ def buildpyext(bld     : Context,
     parent  = bld.bldnode.make_node('/'+name) if haspy else bld.bldnode
 
     node    = bld(features = 'subst',
-                  source   = bld.srcnode.find_resource('builder/_module.template'),
+                  source   = bld.srcnode.find_resource(__package__+'/_module.template'),
                   target   = name+"module.cpp",
                   nsname   = name,
                   module   = mod,
