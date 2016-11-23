@@ -84,7 +84,13 @@ __import__('wafbuilder').make(locals())
 The *wafbuilder* will set things up automatically.
 
 ## Building multiple dynamic libraries:
-The following is a good example:
+Consider a project with sub-directories:
+
+* *src*: a directory containing one sub-directory per python module or c++ library.
+* *tests*: all test files.
+
+The following *wscript* will build the sources and tests:
+
 ~~~
 #!/usr/bin/env python3
 # encoding: utf-8
