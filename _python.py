@@ -14,16 +14,27 @@ from waflib.Context import Context # type: ignore
 from waflib.Tools   import python as pytools # for correcting a bug
 
 pytools.PYTHON_MODULE_TEMPLATE = '''
-import %s as current_module
-version = getattr(current_module, '__version__', None)
-if version is not None:
-    print(str(version))
-else:
-    version = getattr(current_module, 'version', None)
-    if version is not None:
-        print(str(version))
-    else:
-        print('unknown version')
+import os, pkg_resources
+NAME = '%s'
+vers = None
+try:
+    vers = pkg_resources.get_distribution(NAME).version
+except:
+    try:
+        current_module = __import__(NAME)
+        vers = getattr(current_module, '__version__', None)
+
+        if vers is None:
+            vers = getattr(current_module, 'version', None)
+
+        if vers is None:
+            vers = __import__(NAME+'.version').version
+
+        if vers is not None:
+            vers = getattr(vers, '__version__', vers)
+    except:
+        pass
+print('unknown version' if vers is None else str(vers))
 '''
 
 IS_MAKE = YES
