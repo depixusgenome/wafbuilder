@@ -261,6 +261,7 @@ def buildpy(bld:Context, name:str, version:str, **kwargs):
 
     buildpymod(bld, name, pysrc)
     buildpyext(bld, name, version, pysrc, csrc, **kwargs)
+    copypy(bld,name,bld.path.ant_glob('**/*.ipynb'))
 
 def makemodule(glob:dict, **kw):
     u"returns a method for creating cpp modules"
