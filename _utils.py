@@ -22,12 +22,15 @@ def appname(iframe: int  = None) -> str:
         mymod  = mymod[:mymod.rfind('/')]
         myroot = mymod[:mymod.rfind('/')]
         for frame in inspect.getouterframes(inspect.currentframe()):
-            if frame.filename.startswith('<') or mymod in frame.filename:
+            fname = frame.filename.replace('\\', '/')
+            if fname.startswith('<') or mymod in fname:
                 continue
-            if myroot not in frame.filename:
+            if myroot not in fname:
                 continue
-            fname = frame.filename
             break
+        else:
+            raise AttributeError("Could not find appname frame")
+
     else:
         fname = inspect.getouterframes(inspect.currentframe())[iframe].filename
     fname = fname.replace('\\', '/')
