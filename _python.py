@@ -206,7 +206,7 @@ def copypy(bld:Context, arg, items:Sequence):
     def _kword(_):
         return 'Copying'
 
-    root = bld.bldnode.make_node('/'+arg) if isinstance(arg, str) else arg
+    root = bld.bldnode.make_node(arg) if isinstance(arg, str) else arg
     root.mkdir()
     for item in items:
         tgt = item.abspath().replace('\\', '/')
