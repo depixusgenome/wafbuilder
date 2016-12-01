@@ -52,13 +52,15 @@ class Flags(Make):
         return cnf.env['COMPILER_CXX'] == 'msvc'
 
     @classmethod
-    def _convert_flags(cls, cnf, cxx):
+    def convertFlags(cls, cnf, cxx, islinks = False):
+        u"Converts the flabs to msvc equivalents"
         if not cls._ismsvc(cnf):
             return
 
         flags = {'-std=c++14': '/std:c++14',
-                 '-fopenmp':   '',
-                 '-g':         ''}
+                 '-fopenmp':   '' if islinks else '/openmp',
+                 '-g':         '',
+                 }
         cxx   = ' '.join(flags.get(i, i) for i in cxx.split(' '))
         cxx   = cxx.replace('-', '/')
         return cxx
@@ -90,8 +92,8 @@ class Flags(Make):
             links = links .replace('-fopenmp', '')
 
         cls._requirements(cnf)
-        cxx   = cls._convert_flags(cnf, cxx)
-        links = cls._convert_flags(cnf, links)
+        cxx   = cls.convertFlags(cnf, cxx)
+        links = cls.convertFlags(cnf, links)
 
         cnf.check(features  = 'cxx cxxprogram',
                   cxxflags  = cxx,

@@ -9,6 +9,7 @@ from typing     import Sequence, List
 from contextlib import closing
 
 from ._utils    import YES, Make, addconfigure, runall, addmissing, requirements
+from ._cpp      import Flags as CppFlags
 
 from waflib.Context import Context # type: ignore
 from waflib.Tools   import python as pytools # for correcting a bug
@@ -69,7 +70,7 @@ class PyBind11(Make):
         if cnf.options.pybind11 is not None:
             _store(cnf, '-I'+cnf.options.pybind11)
 
-        cnf.env.append_unique('CXXFLAGS_PYEXT', '-std=c++14')
+        cnf.env.append_unique('CXXFLAGS_PYEXT', CppFlags.convertFlags(cnf, '-std=c++14'))
         def _build(bld):
             lib_node = bld.srcnode.make_node('pybind11example.cpp')
             lib_node.write("""
