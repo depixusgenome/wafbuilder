@@ -2,16 +2,17 @@
 # -*- coding: utf-8 -*-
 u"All *basic* python related details"
 import subprocess
-import shutil
 import re
 
 from typing     import Sequence, List
 from contextlib import closing
 
-from ._utils    import YES, Make, addconfigure, runall, addmissing, requirements
+from ._utils    import (YES, Make, addconfigure, runall,
+                        addmissing, requirements, copyfiles)
 
-from waflib.Context import Context # type: ignore
-from waflib.Tools   import python as pytools # for correcting a bug
+from waflib.Configure   import conf
+from waflib.Context     import Context # type: ignore
+from waflib.Tools       import python as pytools # for correcting a bug
 
 pytools.PYTHON_MODULE_TEMPLATE = '''
 import os, pkg_resources
@@ -149,7 +150,7 @@ def checkpy(bld:Context, items:Sequence):
     if len(items) == 0:
         return
 
-    deps = list(pymoduledependencies(items) & bld.env.pyextmodules)
+    deps = list(pymoduledependencies(items) & set(bld.env.pyextmodules))
     def _scan(_):
         nodes = [bld.get_tgen_by_name(dep+'pyext').tasks[-1].outputs[0] for dep in deps]
         return (nodes, [])
@@ -195,31 +196,13 @@ def checkpy(bld:Context, items:Sequence):
         for kwargs in rules:
             bld(source = [item], **kwargs)
 
-def copypy(bld:Context, arg, items:Sequence):
-    u"copy py modules to build root path"
-    if len(items) == 0:
-        return
-
-    def _cpy(tsk):
-        shutil.copy2(tsk.inputs[0].abspath(),
-                     tsk.outputs[0].abspath())
-    def _kword(_):
-        return 'Copying'
-
-    root = bld.bldnode.make_node('/'+arg) if isinstance(arg, str) else arg
-    root.mkdir()
-    for item in items:
-        tgt = item.abspath().replace('\\', '/')
-        tgt = tgt[tgt.rfind('/'+arg+'/')+2+len(arg):]
-        bld(rule = _cpy, source = [item], target = [root.make_node(tgt)], cls_keyword = _kword)
-
 def buildpymod(bld:Context, name:str, pysrc:Sequence):
     u"builds a python module"
     if len(pysrc) == 0:
         return
-    bld    (features = "py", source = pysrc)
-    checkpy(bld, pysrc)
-    copypy (bld, name, pysrc)
+    bld      (features = "py", source = pysrc)
+    checkpy  (bld, pysrc)
+    copyfiles(bld, name, pysrc)
 
 def buildpyext(bld     : Context,
                name    : str,
@@ -254,7 +237,8 @@ def buildpyext(bld     : Context,
     args.setdefault('name',     name+"pyext")
     bld.shlib(**args)
 
-def buildpy(bld:Context, name:str, version:str, **kwargs):
+@conf
+def build_py(bld:Context, name:str, version:str, **kwargs):
     u"builds a python module"
     csrc   = bld.path.ant_glob('**/*.cpp')
     pysrc  = bld.path.ant_glob('**/*.py')
@@ -266,7 +250,10 @@ def makemodule(glob:dict, **kw):
     u"returns a method for creating cpp modules"
     def build(bld:Context):
         u"builds a python module"
-        buildpy(bld, glob['APPNAME'], glob['VERSION'], **kw)
+        app  = glob['APPNAME']
+        vers = glob['VERSION']
+        for name in kw.get("builders", ['py']):
+            getattr(bld, 'build_'+name)(app, vers, **kw)
     return build
 
 addmissing(locals())

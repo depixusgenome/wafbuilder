@@ -2,8 +2,9 @@
 # -*- coding: utf-8 -*-
 u"Default utils for waf"
 import inspect
+import shutil
 from typing         import (Iterator, Callable, # pylint: disable=unused-import
-                            Iterable, Union, cast)
+                            Iterable, Union, Sequence, cast)
 from types          import ModuleType, FunctionType
 from functools      import wraps
 
@@ -172,3 +173,21 @@ def requirements(key):
             mod, vers = tuple(val        for val in vals if len(val))[:2]
             info[mod] = vers.split('.')
     return info
+
+def copyfiles(bld:Context, arg, items:Sequence):
+    u"copy py modules to build root path"
+    if len(items) == 0:
+        return
+
+    def _cpy(tsk):
+        shutil.copy2(tsk.inputs[0].abspath(),
+                     tsk.outputs[0].abspath())
+    def _kword(_):
+        return 'Copying'
+
+    root = bld.bldnode.make_node('/'+arg) if isinstance(arg, str) else arg
+    root.mkdir()
+    for item in items:
+        tgt = item.abspath().replace('\\', '/')
+        tgt = tgt[tgt.rfind('/'+arg+'/')+2+len(arg):]
+        bld(rule = _cpy, source = [item], target = [root.make_node(tgt)], cls_keyword = _kword)
