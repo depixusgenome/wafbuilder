@@ -30,6 +30,13 @@ A number of warning flags are set automatically. See '_cpp.py'.
 *openmp* is detected automatically.
 *cppx14* is used automatically.
 
+### Coffeescript
+Compilation is performed automatically provided the extension used is '.coffee'.
+The output has the extension '.js'. The '.coffee' file is also copied together
+with the '.py' files. In order to activate the coffeescript support,
+one must define it in the list of builders (see wscript file description).
+
+
 ### Python modules
 Modules are compiled and checked using *pylint* and *mypy*.
 
@@ -46,6 +53,9 @@ namespace @nsname@ { void pymodule(pybind11::module &); }
 to be implemented somewhere in one of the c++ sources, where *@nsname@* is the directory name.
 See '_module.template' for more details.
 
+The '.py' and '.ipynb' files are copied to the build directory such that the python module
+can be imported from there.
+
 ## The REQUIRE file
 
 This file uses the following format:
@@ -60,6 +70,9 @@ pandas  0.19.0
 [CPP]
 clang++ 3.8
 g++     4.9
+
+[COFFEE]
+coffee  1.10.0
 ~~~
 
 ### When using a conda environment
@@ -82,6 +95,24 @@ __import__('wafbuilder').make(locals())
 ~~~
 
 The *wafbuilder* will set things up automatically.
+
+## Adding coffeescript support
+
+The file then looks like:
+~~~
+#! /usr/bin/env python
+# encoding: utf-8
+def configure(cnf):
+    cnf.load("coffee", builder.__path__, 'find_coffee') 
+
+__import__('wafbuilder').make(locals(), builders = ['py', 'coffee'])
+~~~
+
+The *configure* function will look for coffeescript and check its version. The 
+minimum version must be defined in the requirements.
+
+The *builders* list specifies that this directory contains both python, possibly cpp,
+as well as coffeescript files.
 
 ## Building multiple dynamic libraries:
 Consider a project with sub-directories:
