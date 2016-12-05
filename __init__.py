@@ -5,8 +5,8 @@ import os
 from typing     import Sequence, Callable
 from functools  import wraps
 
-from ._utils    import addmissing, appname
-from ._python   import makemodule, checkpy, copypy, findpyext
+from ._utils    import addmissing, appname, copyfiles
+from ._python   import makemodule, checkpy, findpyext
 from .          import _git as gitinfo
 from .          import _cpp
 from .          import _python
