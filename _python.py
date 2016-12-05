@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 u"All *basic* python related details"
 import subprocess
+import shutil
 import re
 
 from typing     import Sequence, List
@@ -9,6 +10,7 @@ from contextlib import closing
 
 from ._utils    import (YES, Make, addconfigure, runall,
                         addmissing, requirements, copyfiles)
+from ._cpp      import Flags as CppFlags
 
 from waflib.Configure   import conf
 from waflib.Context     import Context # type: ignore
@@ -70,7 +72,7 @@ class PyBind11(Make):
         if cnf.options.pybind11 is not None:
             _store(cnf, '-I'+cnf.options.pybind11)
 
-        cnf.env.append_unique('CXXFLAGS_PYEXT', '-std=c++14')
+        cnf.env.append_unique('CXXFLAGS_PYEXT', CppFlags.convertFlags(cnf, '-std=c++14'))
         def _build(bld):
             lib_node = bld.srcnode.make_node('pybind11example.cpp')
             lib_node.write("""
@@ -195,6 +197,24 @@ def checkpy(bld:Context, items:Sequence):
     for item in items:
         for kwargs in rules:
             bld(source = [item], **kwargs)
+
+def copypy(bld:Context, arg, items:Sequence):
+    u"copy py modules to build root path"
+    if len(items) == 0:
+        return
+
+    def _cpy(tsk):
+        shutil.copy2(tsk.inputs[0].abspath(),
+                     tsk.outputs[0].abspath())
+    def _kword(_):
+        return 'Copying'
+
+    root = bld.bldnode.make_node(arg) if isinstance(arg, str) else arg
+    root.mkdir()
+    for item in items:
+        tgt = item.abspath().replace('\\', '/')
+        tgt = tgt[tgt.rfind('/'+arg+'/')+2+len(arg):]
+        bld(rule = _cpy, source = [item], target = [root.make_node(tgt)], cls_keyword = _kword)
 
 def buildpymod(bld:Context, name:str, pysrc:Sequence):
     u"builds a python module"
