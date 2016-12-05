@@ -3,6 +3,7 @@
 u"Default utils for waf"
 import inspect
 import shutil
+import subprocess
 from typing         import (Iterator, Callable, # pylint: disable=unused-import
                             Iterable, Union, Sequence, cast)
 from types          import ModuleType, FunctionType
@@ -194,3 +195,13 @@ def copyfiles(bld:Context, arg, items:Sequence):
         tgt = item.abspath().replace('\\', '/')
         tgt = tgt[tgt.rfind('/'+arg+'/')+2+len(arg):]
         bld(rule = _cpy, source = [item], target = [root.make_node(tgt)], cls_keyword = _kword)
+
+def checkversion(cnf, name, minver):
+    u"check version of a program"
+    cnf.find_program(name, var = name.upper())
+    cmd    = [getattr(cnf.env, name.upper())[0], "--version"]
+    found  = cnf.cmd_and_log(cmd).split()[-1]
+    found  = found[found.rfind(' ')+1:].replace(',', '').strip().split('.')
+    if found < minver:
+        cnf.fatal('The %s version is too old, expecting %r'%(name, minver))
+

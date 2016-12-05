@@ -5,12 +5,12 @@ from waflib             import TaskGen
 from waflib.Configure   import conf
 from waflib.Context     import Context
 
-from wafbuilder._utils  import copyfiles
+from wafbuilder._utils  import copyfiles, requirements, checkversion
 
 @conf
 def find_coffee(cnf):
     u"get python headers and modules"
-    cnf.find_program("coffee", var = "COFFEE")
+    checkversion(cnf, 'coffee', requirements('coffee').pop('coffee'))
 
 TaskGen.declare_chain(
     name         = 'coffees',
