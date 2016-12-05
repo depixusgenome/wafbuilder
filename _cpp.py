@@ -55,7 +55,7 @@ class Flags(Make):
     def convertFlags(cls, cnf, cxx, islinks = False):
         u"Converts the flabs to msvc equivalents"
         if not cls._ismsvc(cnf):
-            return
+            return cxx
 
         flags = {'-std=c++14': '/std:c++14',
                  '-fopenmp':   '' if islinks else '/openmp',
