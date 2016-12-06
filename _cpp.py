@@ -12,7 +12,7 @@ class Flags(Make):
     @staticmethod
     def options(opt):
         u"add options"
-        copt = opt.get_option_group(CXX_OPTION_GROUP)
+        copt = opt.add_option_group(CXX_OPTION_GROUP)
         copt.add_option('--cxxflags',
                         dest    = 'cxxflaglist',
                         default = '-std=c++14 -fopenmp -g',
