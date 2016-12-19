@@ -118,18 +118,23 @@ def addmissing(glob):
     u"adds functions 'load', 'options', 'configure', 'build' if missing from a module"
     items = tuple(makes(iter(cls for _, cls in glob.items())))
 
-    def load(opt:Context):
+    def load(_:Context):
         u"applies load from all basic items"
-        opt.load(' '.join(getattr(cls, 'loads', lambda:'')() for cls in items))
+        return ' '.join(getattr(cls, 'loads', lambda:'')() for cls in items)
+
+    def _load(opt:Context):
+        toload = glob.get('load', lambda _: None)(opt)
+        if len(toload):
+            opt.load(toload)
 
     def options(opt:Context):
         u"applies options from all basic items"
-        glob.get('load', lambda _: None)(opt)
+        _load(opt)
         run(opt, 'options', items)
 
     def configure(cnf:Context):
         u"applies configure from all basic items"
-        glob.get('load', lambda _: None)(cnf)
+        _load(cnf)
         run(cnf, 'configure', items)
 
     def build(bld:Context):
@@ -178,6 +183,18 @@ def requirements(key):
             info[mod] = vers.split('.')
     return info
 
+def copyroot(bld:Context, arg):
+    u"returns the root where items are copied"
+    return bld.bldnode.make_node('/'+arg) if isinstance(arg, str) else arg
+
+def copytargets(bld:Context, arg, items):
+    u"yields source and targets for copied files"
+    root = copyroot(bld, arg)
+    for item in items:
+        tgt = item.abspath().replace('\\', '/')
+        tgt = tgt[tgt.rfind('/'+arg+'/')+2+len(arg):]
+        yield (item, root.make_node(tgt))
+
 def copyfiles(bld:Context, arg, items:Sequence):
     u"copy py modules to build root path"
     if len(items) == 0:
@@ -189,12 +206,9 @@ def copyfiles(bld:Context, arg, items:Sequence):
     def _kword(_):
         return 'Copying'
 
-    root = bld.bldnode.make_node('/'+arg) if isinstance(arg, str) else arg
-    root.mkdir()
-    for item in items:
-        tgt = item.abspath().replace('\\', '/')
-        tgt = tgt[tgt.rfind('/'+arg+'/')+2+len(arg):]
-        bld(rule = _cpy, source = [item], target = [root.make_node(tgt)], cls_keyword = _kword)
+    copyroot(bld, arg).mkdir()
+    for src, tgt in copytargets(bld, arg, items):
+        bld(rule = _cpy, source = [src], target = [tgt], cls_keyword = _kword)
 
 def checkversion(cnf, name, minver):
     u"check version of a program"

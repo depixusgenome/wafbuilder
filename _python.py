@@ -9,7 +9,7 @@ from typing     import Sequence, List
 from contextlib import closing
 
 from ._utils    import (YES, Make, addconfigure, runall,
-                        addmissing, requirements, copyfiles)
+                        addmissing, requirements, copyfiles, copytargets)
 from ._cpp      import Flags as CppFlags
 
 from waflib.Configure   import conf
@@ -115,18 +115,27 @@ def configure(cnf:Context):
     cnf.find_program("mypy",   var = "MYPY")
     cnf.find_program("pylint", var = "PYLINT")
 
-def pymoduledependencies(pysrc):
+def pymoduledependencies(pysrc, name = None):
     u"detects dependencies"
     patterns = tuple(re.compile(r'^\s*'+pat) for pat in
-                     (r'from\s+(\w+)\s+import\s+', r'import\s*(\w+)'))
+                     (r'from\s+([\w.]+)\s+import\s+', r'import\s*(\w+)'))
     mods     = set()
     for item in pysrc:
         with closing(open(item.abspath(), 'r')) as stream:
             for line in stream:
+                if 'import' not in line:
+                    continue
+
                 for pat in patterns:
                     ans = pat.match(line)
-                    if ans is not None:
-                        mods.add(ans.group(1))
+                    if ans is None:
+                        continue
+
+                    grp = ans.group(1)
+                    if grp.startswith('._core') and name is not None:
+                        mods.add(name)
+                    else:
+                        mods.add(grp)
     return mods
 
 def findpyext(bld:Context, items:Sequence):
@@ -147,12 +156,15 @@ def haspyext(csrc):
                 return True
     return False
 
-def checkpy(bld:Context, items:Sequence):
+def checkpy(bld:Context, name:str, items:Sequence):
     u"builds tasks for checking code"
     if len(items) == 0:
         return
 
-    deps = list(pymoduledependencies(items) & set(bld.env.pyextmodules))
+    pyext = set(bld.env.pyextmodules)
+    pyext.add(name)
+
+    deps = list(pymoduledependencies(items, name) & pyext)
     def _scan(_):
         nodes = [bld.get_tgen_by_name(dep+'pyext').tasks[-1].outputs[0] for dep in deps]
         return (nodes, [])
@@ -175,7 +187,7 @@ def checkpy(bld:Context, items:Sequence):
         if len(msg):
             bld.fatal('In file %s:\n\t- ' % tsk.inputs[0].abspath()+msg)
 
-    mypy   = '${MYPY} ${SRC} --silent-imports'
+    mypy   = '${MYPY} ${SRC} --silent-imports --fast-parser'
     pylint = ('${PYLINT} ${SRC} '
               + '--init-hook="sys.path.append(\'./\')" '
               + '--msg-template="{path}:{line}:{column}:{C}: [{symbol}] {msg}" '
@@ -194,17 +206,21 @@ def checkpy(bld:Context, items:Sequence):
                    cls_keyword = lambda _: 'PyLint'),
              ] # type: List
 
-    for item in items:
-        for kwargs in rules:
-            bld(source = [item], **kwargs)
-
+    if name in deps:
+        for _, item in copytargets(bld, name, items):
+            for kwargs in rules:
+                bld(source = [item], **kwargs)
+    else:
+        for item in items:
+            for kwargs in rules:
+                bld(source = [item], **kwargs)
 
 def buildpymod(bld:Context, name:str, pysrc:Sequence):
     u"builds a python module"
     if len(pysrc) == 0:
         return
     bld      (features = "py", source = pysrc)
-    checkpy  (bld, pysrc)
+    checkpy  (bld, name, pysrc)
     copyfiles(bld, name, pysrc)
 
 def buildpyext(bld     : Context,
@@ -223,7 +239,7 @@ def buildpyext(bld     : Context,
     args    = kwargs
     bldnode = bld.bldnode.make_node(bld.path.relpath())
     haspy   = len(pysrc)
-    mod     = '_'+name+'_core'                if haspy else name
+    mod     = '_core'                         if haspy else name
     parent  = bld.bldnode.make_node('/'+name) if haspy else bld.bldnode
 
     node    = bld(features = 'subst',
