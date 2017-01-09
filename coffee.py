@@ -22,6 +22,12 @@ TaskGen.declare_chain(
     install_path = None)
 
 @conf
+def configure_coffee(cnf:Context):
+    u"configures coffee"
+    import wafbuilder
+    cnf.load("coffee", wafbuilder.__path__, 'find_coffee') 
+
+@conf
 def build_coffee(bld:Context, name:str, _1, **_2):
     u"builds all coffee files"
     coffees = bld.path.ant_glob('**/*.coffee')

@@ -91,7 +91,7 @@ Simply add:
 ~~~
 #! /usr/bin/env python
 # encoding: utf-8
-__import__('wafbuilder').make(locals())
+make(locals())
 ~~~
 
 The *wafbuilder* will set things up automatically.
@@ -100,12 +100,7 @@ The *wafbuilder* will set things up automatically.
 
 The file then looks like:
 ~~~
-#! /usr/bin/env python
-# encoding: utf-8
-def configure(cnf):
-    cnf.load("coffee", builder.__path__, 'find_coffee') 
-
-__import__('wafbuilder').make(locals(), builders = ['py', 'coffee'])
+make(locals(), builders = ['py', 'coffee'])
 ~~~
 
 The *configure* function will look for coffeescript and check its version. The 

@@ -6,7 +6,7 @@ from typing     import Sequence, Callable
 from functools  import wraps
 
 from ._utils    import addmissing, appname, copyfiles
-from ._python   import makemodule, checkpy, findpyext
+from ._python   import checkpy, findpyext
 from .          import _git as gitinfo
 from .          import _cpp
 from .          import _python
@@ -86,10 +86,23 @@ def make(glob, **kw):
     u"sets default values to wscript global variables"
     def options(*_):
         u"does nothing"
-        pass
-    def configure(*_):
-        u"does nothing"
-        pass
+        for name in kw.get("builders", ['py']):
+            try:
+                __import__(__name__+'.'+name)
+            except ImportError:
+                pass
+
+    def configure(cnf:Context):
+        u"configures a python module"
+        for name in kw.get("builders", ['py']):
+            getattr(cnf, 'configure_'+name, lambda: None)()
+
+    def build(bld:Context):
+        u"builds a python module"
+        app  = glob['APPNAME']
+        vers = glob['VERSION']
+        for name in kw.get("builders", ['py']):
+            getattr(bld, 'build_'+name)(app, vers, **kw)
 
     # pylint: disable=unnecessary-lambda
     toadd = dict(VERSION   = lambda: version(),
@@ -98,7 +111,7 @@ def make(glob, **kw):
                  out       = lambda: output(),
                  options   = lambda: options,
                  configure = lambda: configure,
-                 build     = lambda: makemodule(glob, **kw))
+                 build     = lambda: build)
 
     for key, fcn in toadd.items():
         if key not in glob:
@@ -120,3 +133,4 @@ def recurse(builder, items):
     return _wrapper
 
 addmissing(locals())
+__builtins__['make'] = make

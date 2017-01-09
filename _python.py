@@ -266,14 +266,4 @@ def build_py(bld:Context, name:str, version:str, **kwargs):
     buildpyext(bld, name, version, pysrc, csrc, **kwargs)
     copyfiles(bld,name,bld.path.ant_glob('**/*.ipynb'))
 
-def makemodule(glob:dict, **kw):
-    u"returns a method for creating cpp modules"
-    def build(bld:Context):
-        u"builds a python module"
-        app  = glob['APPNAME']
-        vers = glob['VERSION']
-        for name in kw.get("builders", ['py']):
-            getattr(bld, 'build_'+name)(app, vers, **kw)
-    return build
-
 addmissing(locals())
