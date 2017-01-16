@@ -252,8 +252,9 @@ def buildpyext(bld     : Context,
 
     args.setdefault('source',   csrc)
     args.setdefault('target',   parent.path_from(bldnode)+"/"+mod)
-    args.setdefault('features', ['pyext'])
+    args.setdefault('features', []).append('pyext')
     args.setdefault('name',     name+"pyext")
+
     bld.shlib(**args)
 
 @conf
