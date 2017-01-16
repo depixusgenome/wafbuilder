@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u"Default cpp for waf"
-from ._utils import YES, runall, addmissing, Make, requirements
-from waflib  import Utils
+from ._utils        import YES, runall, addmissing, Make, requirements
+from waflib         import Utils
+from waflib.Context import Context
 
 IS_MAKE = YES
 CXX_OPTION_GROUP = 'C++ Options'
+
+def _ismsvc(cnf):
+    return cnf.env['COMPILER_CXX'] == 'msvc'
 
 class Flags(Make):
     u"deal with cxx/ld flags"
@@ -29,32 +33,10 @@ class Flags(Make):
                         action   = 'store_true',
                         help     = 'disable OpenMP')
 
-    @classmethod
-    def _requirements(cls, cnf):
-        info = requirements("cxx")
-        curr = cnf.env['CC_VERSION']
-        if cls._ismsvc(cnf):
-            curr = cnf.env['MSVC_VERSION']
-            if isinstance(curr, float):
-                curr = str(curr).split('.')
-
-        if cnf.env['COMPILER_CXX'] not in info:
-            cnf.fatal(cnf.env['COMPILER_CXX'] +' min version should be set in the REQUIRE file')
-
-        minv = info[cnf.env['COMPILER_CXX']]
-        if tuple(int(val) for val in curr) < tuple(int(val) for val in minv):
-            cnf.fatal(cnf.env['COMPILER_CXX']
-                      +' version '+'.'.join(curr)
-                      +' should be greater than '+'.'.join(minv))
-
     @staticmethod
-    def _ismsvc(cnf):
-        return cnf.env['COMPILER_CXX'] == 'msvc'
-
-    @classmethod
-    def convertFlags(cls, cnf, cxx, islinks = False):
+    def convertFlags(cnf, cxx, islinks = False):
         u"Converts the flabs to msvc equivalents"
-        if not cls._ismsvc(cnf):
+        if not _ismsvc(cnf):
             return cxx
 
         flags = {'-std=c++14': '/std:c++14',
@@ -81,7 +63,7 @@ class Flags(Make):
             '-Wparentheses',
             '-Wsequence-point',
             ]
-        if cls._ismsvc(cnf):
+        if _ismsvc(cnf):
             warnings = ['-Wall']
 
         cxx   = cnf.options.cxxflaglist + ' ' + ' '.join(warnings)
@@ -91,7 +73,6 @@ class Flags(Make):
             cxx   = cxx.replace('-fopenmp', '')
             links = links .replace('-fopenmp', '')
 
-        cls._requirements(cnf)
         cxx   = cls.convertFlags(cnf, cxx)
         links = cls.convertFlags(cnf, links)
 
@@ -114,5 +95,32 @@ def loads():
 def options(opt):
     u"add options"
     opt.add_option_group(CXX_OPTION_GROUP)
+
+@runall
+def configure(cnf:Context):
+    u"configures c++ elements"
+    info = requirements("cxx")
+    curr = cnf.env['CC_VERSION']
+    if _ismsvc(cnf):
+        curr = cnf.env['MSVC_VERSION']
+        if isinstance(curr, float):
+            curr = str(curr).split('.')
+
+    if cnf.env['COMPILER_CXX'] not in info:
+        cnf.fatal(cnf.env['COMPILER_CXX'] +' min version should be set in the REQUIRE file')
+
+    minv = info[cnf.env['COMPILER_CXX']]
+    if tuple(int(val) for val in curr) < tuple(int(val) for val in minv):
+        cnf.fatal(cnf.env['COMPILER_CXX']
+                  +' version '+'.'.join(curr)
+                  +' should be greater than '+'.'.join(minv))
+
+    for lib, vers in info.items():
+        if lib in ('msvc', 'clang++', 'g++'):
+            continue
+        cnf.check_cfg(package         = lib,
+                      uselib_store    = lib,
+                      args            = '--cflags --libs',
+                      atleast_version = '.'.join(vers))
 
 addmissing(locals())

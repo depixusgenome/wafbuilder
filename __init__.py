@@ -101,8 +101,10 @@ def make(glob, **kw):
         u"builds a python module"
         app  = glob['APPNAME']
         vers = glob['VERSION']
+        kwa  = dict(kw)
+        kwa .pop('builders', None)
         for name in kw.get("builders", ['py']):
-            getattr(bld, 'build_'+name)(app, vers, **kw)
+            getattr(bld, 'build_'+name)(app, vers, **kwa)
 
     # pylint: disable=unnecessary-lambda
     toadd = dict(VERSION   = lambda: version(),
