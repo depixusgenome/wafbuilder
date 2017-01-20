@@ -285,4 +285,22 @@ def build_py(bld:Context, name:str, version:str, **kwargs):
     buildpyext(bld, name, version, pysrc, csrc, **kwargs)
     copyfiles(bld,name,bld.path.ant_glob('**/*.ipynb'))
 
+def condaenv(stream, name, reqs = None):
+    u"creates a conda yaml file"
+    if reqs is None:
+        reqs = tuple(i for i, (_, j) in  requiredversion('python').items() if j)
+
+    print('name: '+name, file = stream)
+    print('channels: !!python/tuple\n-defaults\ndependencies:', file = stream)
+    items = subprocess.check_output((b'conda', b'list')).split(b'\n')
+    for item in items:
+        item = item.decode('utf-8').split()
+        if not (len(item) and any(name == item[0] for name in reqs)):
+            continue
+
+        if len(item) == 4:
+            print(' - '+item[-1]+'::'+'='.join(item[:-1]), file = stream)
+        else:
+            print(' - '+'='.join(item), file = stream)
+
 addmissing(locals())
