@@ -1,21 +1,32 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u"Default cpp for waf"
-from ._utils        import YES, runall, addmissing, Make, requirements
-from waflib         import Utils
-from waflib.Context import Context
+import sys
+from typing             import Optional
+from distutils.version  import LooseVersion
+from waflib             import Utils
+from waflib.Context     import Context
+from ._utils            import YES, runall, addmissing, Make
+from ._requirements     import requirementcheck, isrequired
 
-IS_MAKE = YES
+IS_MAKE          = YES
 CXX_OPTION_GROUP = 'C++ Options'
+COMPILERS        = 'g++', 'clang++', 'msvc'
 
-def _ismsvc(cnf):
+def _ismsvc(cnf:Context):
     return cnf.env['COMPILER_CXX'] == 'msvc'
+
+def _isrequired():
+    return isrequired('cpp')
 
 class Flags(Make):
     u"deal with cxx/ld flags"
     @staticmethod
     def options(opt):
         u"add options"
+        if not _isrequired():
+            return
+
         copt = opt.add_option_group(CXX_OPTION_GROUP)
         copt.add_option('--cxxflags',
                         dest    = 'cxxflaglist',
@@ -34,7 +45,7 @@ class Flags(Make):
                         help     = 'disable OpenMP')
 
     @staticmethod
-    def convertFlags(cnf, cxx, islinks = False):
+    def convertFlags(cnf:Context, cxx, islinks = False):
         u"Converts the flabs to msvc equivalents"
         if not _ismsvc(cnf):
             return cxx
@@ -42,14 +53,19 @@ class Flags(Make):
         flags = {'-std=c++14': '/std:c++14',
                  '-fopenmp':   '' if islinks else '/openmp',
                  '-g':         '',
-                 }
+                }
         cxx   = ' '.join(flags.get(i, i) for i in cxx.split(' '))
         cxx   = cxx.replace('-', '/')
         return cxx
 
+    _DONE = False
     @classmethod
-    def configure(cls, cnf):
+    def configure(cls, cnf:Context):
         u"setup configure"
+        if not _isrequired() or cls._DONE:
+            return
+        cls._DONE = True
+
         warnings = [
             '-Werror=implicit-function-declaration',
             '-W', '-Wall', '-Wextra','-Wno-write-strings', '-Wunused',
@@ -89,38 +105,40 @@ class Flags(Make):
 
 def loads():
     u"returns all features needed by cpp"
+    if not _isrequired():
+        return ''
+    if sys.platform == "win32":
+        return 'compiler_cxx msvc'
     return 'compiler_cxx'
 
 @runall
-def options(opt):
+def options(opt:Context):
     u"add options"
-    opt.add_option_group(CXX_OPTION_GROUP)
+    if _isrequired():
+        opt.add_option_group(CXX_OPTION_GROUP)
 
-@runall
-def configure(cnf:Context):
-    u"configures c++ elements"
-    info = requirements("cxx")
-    curr = cnf.env['CC_VERSION']
-    if _ismsvc(cnf):
-        curr = cnf.env['MSVC_VERSION']
+@requirementcheck
+def check_cpp_default(cnf:Context, name:str, version:Optional[str]):
+    u"Adds a requirement checker"
+    if name in COMPILERS:
+        if cnf.env['COMPILER_CXX'] != name:
+            return
+
+        curr = cnf.env['CC_VERSION']
+        if _ismsvc(cnf):
+            curr = cnf.env['MSVC_VERSION']
         if isinstance(curr, float):
-            curr = str(curr).split('.')
+            curr = str(curr)
+        elif isinstance(curr, tuple):
+            curr = '.'.join(curr)
 
-    if cnf.env['COMPILER_CXX'] not in info:
-        cnf.fatal(cnf.env['COMPILER_CXX'] +' min version should be set in the REQUIRE file')
-
-    minv = info[cnf.env['COMPILER_CXX']]
-    if tuple(int(val) for val in curr) < tuple(int(val) for val in minv):
-        cnf.fatal(cnf.env['COMPILER_CXX']
-                  +' version '+'.'.join(curr)
-                  +' should be greater than '+'.'.join(minv))
-
-    for lib, vers in info.items():
-        if lib in ('msvc', 'clang++', 'g++'):
-            continue
-        cnf.check_cfg(package         = lib,
-                      uselib_store    = lib,
+        if LooseVersion(curr) < LooseVersion(version):
+            cnf.fatal(cnf.env['COMPILER_CXX']
+                      +' version '+curr
+                      +' should be greater than '+version)
+    else:
+        cnf.check_cfg(package         = name,
+                      uselib_store    = name,
                       args            = '--cflags --libs',
-                      atleast_version = '.'.join(vers))
-
+                      atleast_version = version)
 addmissing(locals())

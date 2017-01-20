@@ -5,12 +5,8 @@ from waflib             import TaskGen
 from waflib.Configure   import conf
 from waflib.Context     import Context
 
-from wafbuilder._utils  import copyfiles, requirements, checkversion
-
-@conf
-def find_coffee(cnf):
-    u"get python headers and modules"
-    checkversion(cnf, 'coffee', requirements('coffee').pop('coffee'))
+from ._utils        import copyfiles
+from ._requirements import checkprogramversion, requirementcheck, isrequired
 
 TaskGen.declare_chain(
     name         = 'coffees',
@@ -21,15 +17,14 @@ TaskGen.declare_chain(
     reentrant    = False,
     install_path = None)
 
-@conf
-def configure_coffee(cnf:Context):
-    u"configures coffee"
-    import wafbuilder
-    cnf.load("coffee", wafbuilder.__path__, 'find_coffee') 
+requirementcheck(checkprogramversion, 'coffee', 'coffee')
 
 @conf
 def build_coffee(bld:Context, name:str, _1, **_2):
     u"builds all coffee files"
+    if not isrequired('coffee'):
+        return
+
     coffees = bld.path.ant_glob('**/*.coffee')
     if len(coffees):
         bld      (source = coffees)

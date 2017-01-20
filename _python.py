@@ -2,19 +2,19 @@
 # -*- coding: utf-8 -*-
 u"All *basic* python related details"
 import subprocess
-import shutil
 import re
 
-from typing     import Sequence, List
-from contextlib import closing
-
-from ._utils    import (YES, Make, addconfigure, runall,
-                        addmissing, requirements, copyfiles, copytargets)
-from ._cpp      import Flags as CppFlags
-
+from typing             import Sequence, List
+from contextlib         import closing
 from waflib.Configure   import conf
 from waflib.Context     import Context # type: ignore
 from waflib.Tools       import python as pytools # for correcting a bug
+
+from ._utils        import (YES, Make, addconfigure, runall,
+                            addmissing, copyfiles, copytargets)
+from ._cpp          import Flags as CppFlags
+from ._requirements import (requirementcheck, isrequired, checkprogramversion,
+                            requiredversion)
 
 pytools.PYTHON_MODULE_TEMPLATE = '''
 import os, pkg_resources
@@ -50,6 +50,9 @@ def _store(cnf:Context, flg:str):
 def numpy(cnf:Context):
     u"tests numpy and obtains its headers"
     # modules are checked by parsing REQUIRE
+    if not isrequired('python', 'numpy'):
+        return
+
     cmd = cnf.env.PYTHON[0]                                     \
         + ' -c "from numpy.distutils import misc_util as n;'    \
         + ' print(\'-I\'.join([\'\']+n.get_numpy_include_dirs()))"'
@@ -58,8 +61,12 @@ def numpy(cnf:Context):
 
 class PyBind11(Make):
     u"tests pybind11 and obtains its headers"
-    @staticmethod
-    def options(opt):
+    _NAME = 'python', 'pybind11'
+    @classmethod
+    def options(cls, opt):
+        if not isrequired(*cls._NAME):
+            return
+
         opt.get_option_group('Python Options')\
            .add_option('--pybind11',
                        dest    = 'pybind11',
@@ -67,8 +74,11 @@ class PyBind11(Make):
                        action  = 'store',
                        help    = 'pybind11 include path')
 
-    @staticmethod
-    def configure(cnf):
+    @classmethod
+    def configure(cls, cnf):
+        if not isrequired(*cls._NAME):
+            return
+
         if cnf.options.pybind11 is not None:
             _store(cnf, '-I'+cnf.options.pybind11)
 
@@ -98,22 +108,28 @@ class PyBind11(Make):
 
 def loads():
     u"returns python features to be loaded"
+    if not isrequired('python'):
+        return ""
     return 'python'
+
+
+requirementcheck(lambda *_: None, lang = 'python', name = 'python')
+
+@requirementcheck
+def check_python_default(cnf, name, version):
+    u"Adds a default requirement checker"
+    cond = 'ver >= num('+version.replace('.',',')+')'
+    cnf.check_python_module(name.replace("python-", ""), condition = cond)
+
+requirementcheck(checkprogramversion, lang = 'python', name = 'pylint')
+requirementcheck(checkprogramversion, lang = 'python', name = 'mypy')
 
 @runall
 def configure(cnf:Context):
     u"get python headers and modules"
-    info   = requirements('python')
-    pyvers = info.pop('python')
-    cnf.check_python_version(tuple(int(val) for val in pyvers))
+    version = requiredversion('python', 'python')
+    cnf.check_python_version(tuple(int(val) for val in version.split('.')))
     cnf.check_python_headers()
-
-    for mod, vers in info.items():
-        cnf.check_python_module(mod.replace("python-", ""),
-                                condition = 'ver >= num('+','.join(vers)+')')
-
-    cnf.find_program("mypy",   var = "MYPY")
-    cnf.find_program("pylint", var = "PYLINT")
 
 def pymoduledependencies(pysrc, name = None):
     u"detects dependencies"
@@ -241,7 +257,6 @@ def buildpyext(bld     : Context,
     haspy   = len(pysrc)
     mod     = '_core'                         if haspy else name
     parent  = bld.bldnode.make_node('/'+name) if haspy else bld.bldnode
-
     node    = bld(features = 'subst',
                   source   = bld.srcnode.find_resource(__package__+'/_module.template'),
                   target   = name+"module.cpp",
@@ -260,6 +275,9 @@ def buildpyext(bld     : Context,
 @conf
 def build_py(bld:Context, name:str, version:str, **kwargs):
     u"builds a python module"
+    if not isrequired('python'):
+        return
+
     csrc   = bld.path.ant_glob('**/*.cpp')
     pysrc  = bld.path.ant_glob('**/*.py')
 

@@ -5,13 +5,13 @@ import os
 from typing     import Sequence, Callable
 from functools  import wraps
 
-from ._utils    import addmissing, appname, copyfiles
-from ._python   import checkpy, findpyext
-from .          import _git as gitinfo
-from .          import _cpp
-from .          import _python
 from waflib.Context import Context
 from waflib.Build   import BuildContext
+
+from ._requirements import require, check as _checkrequirements
+from ._utils        import addmissing, appname, copyfiles, runall
+from ._python       import checkpy, findpyext
+from .              import _git as gitinfo
 
 def wscripted(path) -> Sequence[str]:
     u"return subdirs with wscript in them"
@@ -127,12 +127,19 @@ def recurse(builder, items):
     def _wrapper(fcn):
         @wraps(fcn)
         def _wrap(bld):
-            fcn(bld)
             getattr(builder, fcn.__name__)(bld)
+            fcn(bld)
             for item in items:
                 bld.recurse(item)
         return _wrap
     return _wrapper
 
+
 addmissing(locals())
-__builtins__['make'] = make
+def configure(cnf:Context, __old__ = locals().pop('configure')):
+    u"Default configure"
+    __old__(cnf)
+    _checkrequirements(cnf)
+
+__builtins__['make']    = make
+__builtins__['require'] = require
