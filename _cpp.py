@@ -7,7 +7,7 @@ from distutils.version  import LooseVersion
 from waflib             import Utils
 from waflib.Context     import Context
 from ._utils            import YES, runall, addmissing, Make
-from ._requirements     import requirementcheck, isrequired
+from ._requirements     import requirementcheck, isrequired, requiredversion
 
 IS_MAKE          = YES
 CXX_OPTION_GROUP = 'C++ Options'
@@ -103,13 +103,47 @@ class Flags(Make):
 
         cnf.env.append_unique('CXXFLAGS', warnings)
 
+class Boost(Make):
+    u"deal with cxx/ld flags"
+    _H_ONLY = 'accumulators',
+    @staticmethod
+    def _getlibs():
+        names = set()
+        curr  = LooseVersion('0.0')
+        for name, (vers, _) in requiredversion('cpp').items():
+            if name.startswith('boost_'):
+                names.add(name.split('_')[-1])
+                if vers is not None and LooseVersion(vers) > curr:
+                    curr = LooseVersion(vers)
+        return names, curr
+
+    @classmethod
+    def options(cls, opt:Context):
+        u"setup options"
+        if len(cls._getlibs()[0]):
+            opt.load('boost')
+
+    @classmethod
+    def configure(cls, cnf:Context):
+        u"setup configure"
+        libs, vers = cls._getlibs()
+        if len(libs):
+            cnf.load('boost')
+            cnf.check_boost(lib = ' '.join(libs-set(cls._H_ONLY)), mandatory = True)
+            if LooseVersion(cnf.env.BOOST_VERSION.replace('_', '.')) < vers:
+                cnf.fatal('Boost version is too old: %s < %s'
+                          % (str(vers), str(cnf.env.BOOST_VERSION)))
+
 def loads():
     u"returns all features needed by cpp"
     if not _isrequired():
         return ''
+
+    load = 'compiler_cxx'
+
     if sys.platform == "win32":
-        return 'compiler_cxx msvc'
-    return 'compiler_cxx'
+        load += ' msvc'
+    return load
 
 @runall
 def options(opt:Context):
@@ -117,28 +151,34 @@ def options(opt:Context):
     if _isrequired():
         opt.add_option_group(CXX_OPTION_GROUP)
 
+@requirementcheck(lang = 'cxx', name = COMPILERS)
+def check_cpp_compiler(cnf:Context, name:str, version:Optional[str]):
+    u"checks the compiler version"
+    if cnf.env['COMPILER_CXX'] != name:
+        return
+
+    curr = cnf.env['CC_VERSION']
+    if _ismsvc(cnf):
+        curr = cnf.env['MSVC_VERSION']
+    if isinstance(curr, float):
+        curr = str(curr)
+    elif isinstance(curr, tuple):
+        curr = '.'.join(curr)
+
+    if LooseVersion(curr) < LooseVersion(version):
+        cnf.fatal(cnf.env['COMPILER_CXX']
+                  +' version '+curr
+                  +' should be greater than '+version)
+
 @requirementcheck
 def check_cpp_default(cnf:Context, name:str, version:Optional[str]):
     u"Adds a requirement checker"
-    if name in COMPILERS:
-        if cnf.env['COMPILER_CXX'] != name:
-            return
-
-        curr = cnf.env['CC_VERSION']
-        if _ismsvc(cnf):
-            curr = cnf.env['MSVC_VERSION']
-        if isinstance(curr, float):
-            curr = str(curr)
-        elif isinstance(curr, tuple):
-            curr = '.'.join(curr)
-
-        if LooseVersion(curr) < LooseVersion(version):
-            cnf.fatal(cnf.env['COMPILER_CXX']
-                      +' version '+curr
-                      +' should be greater than '+version)
+    if name.startswith('boost'):
+        return
     else:
         cnf.check_cfg(package         = name,
                       uselib_store    = name,
                       args            = '--cflags --libs',
                       atleast_version = version)
+
 addmissing(locals())

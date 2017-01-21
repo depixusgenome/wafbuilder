@@ -2,7 +2,8 @@
 # -*- coding: utf-8 -*-
 u"Dealing with requirements"
 from distutils.version  import LooseVersion
-from typing             import Dict, Set, Callable, Tuple, Optional # pylint: disable=unused-import
+from typing             import (Dict, Set, Callable, # pylint: disable=unused-import
+                                Optional, Tuple, Iterable)
 from collections        import OrderedDict
 
 class RequirementManager:
@@ -10,24 +11,35 @@ class RequirementManager:
     def __init__(self):
         self._checks = OrderedDict() # Dict[str,Dict[str,Callable]]
         self._reqs   = OrderedDict() # Dict[str,Dict[str,Tuple[Optional[str,bool]]]]
+        self._done   = False
 
-    def requirementcheck(self, fcn, lang = None, name = None):
+    def requirementcheck(self, fcn = None, lang = None, name = None):
         u"adds a means for checking an item"
-        if lang is None:
-            assert fcn.__name__.startswith('check_')
-            if fcn.__name__.count('_') == 1:
-                lang = name = fcn.__name__.split('_')[-1]
-            else:
-                lang,  name = fcn.__name__.split('_')[1:]
+        def _wrapper(item, lang = lang, name = name):
+            self._done = False
+            fname      = item.__name__
+            if lang is None:
+                assert fname.startswith('check_')
+                if fname.count('_') == 1:
+                    lang = name = fname.split('_')[-1]
+                else:
+                    lang,  name = fname.split('_')[1:]
 
-        elif name is None:
-            if fcn.__name__.count('_') == 1:
-                name = lang
-            else:
-                name = fcn.__name__.split('_')[-1]
+            elif name is None:
+                if fname.count('_') == 1:
+                    name = lang
+                else:
+                    name = fname.split('_')[-1]
 
-        self._checks.setdefault(lang, OrderedDict())[name] = fcn
-        return fcn
+            lang = str(lang).lower().replace('cxx', 'cpp')
+            dic  = self._checks.setdefault(lang, OrderedDict())
+            if isinstance(name, (tuple, list)):
+                dic.update(dict.fromkeys((i.lower() for i in name), item))
+            else:
+                dic[name.lower()] = item
+            return item
+
+        return _wrapper if fcn is None else _wrapper(fcn)
 
     def _reqfromlangdict(self, lang, rtime, kwa):
         if lang is None:
@@ -59,24 +71,26 @@ class RequirementManager:
 
     def require(self, lang = None, name = None, version = None, rtime = True, **kwa):
         u"adds a requirement"
+        self._done = False
         if isinstance(lang, str):
-            if isinstance(name, str):
-                lang = lang.lower()
-                if lang == 'cxx':
-                    lang = 'cpp'
+            lang = str(lang).lower().replace('cxx', 'cpp')
 
+            if isinstance(name, str):
                 name      = str(name).lower()
-                tmp       = self._reqs.setdefault(lang.lower(), OrderedDict())
+                tmp       = self._reqs.setdefault(lang, OrderedDict())
                 tmp[name] = str(version), rtime
 
-            elif isinstance(name, dict):
+            elif isinstance(name, Dict):
                 self._reqfromnamedict(lang, name, rtime, kwa)
 
             elif version is not None:
                 if len(kwa):
                     raise ValueError()
-
-                self.require(lang, lang, version, rtime)
+                elif isinstance(name, Iterable):
+                    for i in name:
+                        self.require(lang, i, version, rtime)
+                else:
+                    self.require(lang, lang, version, rtime)
             elif len(kwa):
                 self._reqfromnamedict(lang, kwa, rtime, {})
             else:
@@ -90,6 +104,10 @@ class RequirementManager:
 
     def check(self, cnf):
         u"checks whether the requirements are met"
+        if self._done:
+            return
+        self._done = True
+
         for lang in self._reqs:
             cnf.load(__package__+'._'+lang)
 
@@ -145,7 +163,7 @@ def isrequired(lang, name = None):
     else:
         return (lang, name) in _REQ
 
-def requirementcheck(fcn, lang = None, name = None):
+def requirementcheck(fcn = None, lang = None, name = None):
     u"adds a means for checking an item"
     return _REQ.requirementcheck(fcn, lang, name)
 

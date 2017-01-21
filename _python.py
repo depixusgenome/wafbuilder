@@ -74,10 +74,12 @@ class PyBind11(Make):
                        action  = 'store',
                        help    = 'pybind11 include path')
 
+    _DONE = False
     @classmethod
     def configure(cls, cnf):
-        if not isrequired(*cls._NAME):
+        if not isrequired(*cls._NAME) or cls._DONE:
             return
+        cls._DONE = True
 
         if cnf.options.pybind11 is not None:
             _store(cnf, '-I'+cnf.options.pybind11)
@@ -127,6 +129,8 @@ requirementcheck(checkprogramversion, lang = 'python', name = 'mypy')
 @runall
 def configure(cnf:Context):
     u"get python headers and modules"
+    if 'PYTHON_VERSION' in cnf.env:
+        return
     version = requiredversion('python', 'python')
     cnf.check_python_version(tuple(int(val) for val in version.split('.')))
     cnf.check_python_headers()
