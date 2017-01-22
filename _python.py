@@ -14,7 +14,7 @@ from ._utils        import (YES, Make, addconfigure, runall,
                             addmissing, copyfiles, copytargets)
 from ._cpp          import Flags as CppFlags
 from ._requirements import (requirementcheck, isrequired, checkprogramversion,
-                            requiredversion)
+                            requiredversion, runtime)
 
 pytools.PYTHON_MODULE_TEMPLATE = '''
 import os, pkg_resources
@@ -120,7 +120,7 @@ requirementcheck(lambda *_: None, lang = 'python', name = 'python')
 @requirementcheck
 def check_python_default(cnf, name, version):
     u"Adds a default requirement checker"
-    cond = 'ver >= num('+version.replace('.',',')+')'
+    cond = 'ver >= num('+str(version).replace('.',',')+')'
     cnf.check_python_module(name.replace("python-", ""), condition = cond)
 
 requirementcheck(checkprogramversion, lang = 'python', name = 'pylint')
@@ -132,7 +132,7 @@ def configure(cnf:Context):
     if 'PYTHON_VERSION' in cnf.env:
         return
     version = requiredversion('python', 'python')
-    cnf.check_python_version(tuple(int(val) for val in version.split('.')))
+    cnf.check_python_version(tuple(int(val) for val in str(version).split('.')))
     cnf.check_python_headers()
 
 def pymoduledependencies(pysrc, name = None):
@@ -226,6 +226,12 @@ def checkpy(bld:Context, name:str, items:Sequence):
                    cls_keyword = lambda _: 'PyLint'),
              ] # type: List
 
+    if not requiredversion('python', 'pylint'):
+        rules.pop()
+
+    if not requiredversion('python', 'mypy'):
+        rules.pop(1)
+
     if name in deps:
         for _, item in copytargets(bld, name, items):
             for kwargs in rules:
@@ -289,17 +295,21 @@ def build_py(bld:Context, name:str, version:str, **kwargs):
     buildpyext(bld, name, version, pysrc, csrc, **kwargs)
     copyfiles(bld,name,bld.path.ant_glob('**/*.ipynb'))
 
-def condaenv(stream, name, reqs = None):
+def condaenv(name, reqs = None, stream = None):
     u"creates a conda yaml file"
     if reqs is None:
-        reqs = tuple(i for i, (_, j) in  requiredversion('python').items() if j)
+        reqs = tuple(runtime('python').items())
 
+    pots = {i for i, _ in reqs}
     print('name: '+name, file = stream)
     print('channels: !!python/tuple\n-defaults\ndependencies:', file = stream)
     items = subprocess.check_output((b'conda', b'list')).split(b'\n')
     for item in items:
         item = item.decode('utf-8').split()
-        if not (len(item) and any(name == item[0] for name in reqs)):
+        if not len(item):
+            continue
+
+        if item[0] not in pots:
             continue
 
         if len(item) == 4:

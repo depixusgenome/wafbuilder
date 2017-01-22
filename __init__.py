@@ -8,7 +8,8 @@ from functools  import wraps
 from waflib.Context import Context
 from waflib.Build   import BuildContext
 
-from ._requirements import require, check as _checkrequirements
+from ._requirements import (require, check as _checkrequirements,
+                            requiredversion, requirements)
 from ._utils        import addmissing, appname, copyfiles, runall
 from ._python       import checkpy, findpyext, condaenv
 from .              import _git as gitinfo

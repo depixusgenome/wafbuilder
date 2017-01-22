@@ -3,7 +3,7 @@
 The module provides a wrapper around *waf* which allows building projects quickly.
 A new projects requires:
 
-* A *REQUIRE* file, listing all external libraries and compilers.
+* requirement management
 * A *wscript* file at the root of the project as well as possibly in all sub-directories to be compiled separatly.
 
 ## Checked Coding Rules
@@ -56,23 +56,31 @@ See '_module.template' for more details.
 The '.py' and '.ipynb' files are copied to the build directory such that the python module
 can be imported from there.
 
-## The REQUIRE file
+## The Requirement management
 
-This file uses the following format:
+A *require* function is available as a builtin (no imports).
+One calls it within a *wscript* file, providing:
+    
+1. a language: python, cpp or coffee
+2. a package name: numpy, nlopt, boost_math, ...
+3. a version: '1.1.1', ...
+4. whether it is runtime only or not.
+
+The code would look like:
 
 ~~~
-# anything after a '#' is a comment
-[PYTHON] # anything beyond this is python related
-# First column is the name, second column is the min version, other columns don't matter
-python  3.5.2
-pandas  0.19.0
+# no package name provided: the name is defaulted to the language
+# the version is a float but could be a string
+require(python = 3.5, rtime = True)
 
-[CPP]
-clang++ 3.8
-g++     4.9
+# provide package names using keyword arguments
+require('python', numpy = '1.11.1', pandas = 3.2, rtime = True)
 
-[COFFEE]
-coffee  1.10.0
+# provide one package name only
+require('cpp', 'g++', 5.6, False)
+
+# provide one a list of package names with the same version for all
+require('cpp', ('boost_math', 'boost_accumulators'),  1.60, False)
 ~~~
 
 ### When using a conda environment
@@ -120,37 +128,62 @@ The following *wscript* will build the sources and tests:
 ~~~
 #!/usr/bin/env python3
 # encoding: utf-8
-import os
 import wafbuilder as builder
+
+# add minimum version for c++
+require(cxx    = {'msvc'     : 14.0,
+                  'clang++'  : 3.8,
+                  'g++'      : 5.4},
+        rtime = False)
+
+# add minimum version for python as well as some basic modules
+require(python = {'python': 3.5, 'numpy': '1.11.2', 'pandas': '0.19.0'},
+        rtime  = True)
+
+# add minimum version for python as well as some basic modules,
+# needed only for building
+require(python = {'pybind11' : '2.0.1',
+                  'pylint'   : '1.5.4',
+                  'pytest'   : '3.0.4',
+                  'mypy'     : '0.4.4'},
+        rtime  = False)
 
 # _ALL: the list of sub-directories
 _ALL = ('tests',) + tuple(builder.wscripted("src"))
 
-def _recurse(fcn):
-    u"helper function for iterating over all directories"
-    return builder.recurse(builder, _ALL)(fcn)
-
-def environment(cnf):
-    u"prints the environment: use commandline 'python3 waf environment'"
-    print(cnf.env)
-
-@_recurse
 def options(opt):
     u"Needed by waf, simply calls 'options' in sub-directories'
-    pass
+    builder.options(opt)
+    for item in _ALL:
+        opt.recurse(item)
 
-@_recurse
 def configure(cnf):
-    u"Needed by waf, simply calls 'options' in sub-directories'
-    pass
+    u"Needed by waf, simply calls 'configure' in sub-directories'
+    builder.configure(cnf)
+    for item in _ALL:
+        cnf.recurse(item)
 
-@_recurse
 def build(bld):
     u"""
     Needed by waf, calls 'options' in sub-directories
     and detects those using pybind11
     """
+    builder.configure(bld)
     builder.findpyext(bld, builder.wscripted('src'))
+    for item in _ALL:
+        bld.recurse(item)
+
+def environment(cnf):
+    u"prints the environment: use commandline 'python3 waf environment'"
+    print(cnf.env)
+
+def condaenv(_):
+    u"prints the conda recipe"
+    builder.condaenv('myprojectname')
+
+def requirements(_):
+    u"prints the project's requirements"
+    builder.requirements()
 
 # the following creates specific build functions for all
 # sub-directories. Do 'python3 waf --help' to see this

@@ -2,9 +2,12 @@
 # -*- coding: utf-8 -*-
 u"Dealing with requirements"
 from distutils.version  import LooseVersion
+from copy               import deepcopy
 from typing             import (Dict, Set, Callable, # pylint: disable=unused-import
                                 Optional, Tuple, Iterable)
+from waflib.Context     import Context
 from collections        import OrderedDict
+from ._utils            import appname
 
 class RequirementManager:
     u"Deals with requirements"
@@ -76,9 +79,10 @@ class RequirementManager:
             lang = str(lang).lower().replace('cxx', 'cpp')
 
             if isinstance(name, str):
-                name      = str(name).lower()
-                tmp       = self._reqs.setdefault(lang, OrderedDict())
-                tmp[name] = str(version), rtime
+                name = str(name).lower()
+                tmp  = (self._reqs.setdefault(lang, OrderedDict())
+                        .setdefault(name, OrderedDict()))
+                tmp[appname()] = LooseVersion(str(version)), rtime
 
             elif isinstance(name, Dict):
                 self._reqfromnamedict(lang, name, rtime, kwa)
@@ -114,25 +118,43 @@ class RequirementManager:
         for lang, items in self._reqs.items():
             fcns    = self._checks[lang]
             default = fcns.get('default', lambda *x: None)
-            for name, (version, _1) in items.items():
+            for name, origs in items.items():
+                version = max(vers for vers, _ in origs.values())
                 fcns.get(name, default)(cnf, name, version)
 
-    def buildonly(self):
+    def buildonly(self, lang = None):
         u"returns build only dependencies"
-        return {lang: {name: version for name, (version, isrt) in mods.items() if not isrt}
-                for lang, mods in self._reqs.items()}
+        if lang is None:
+            return {lang: self.buildonly(lang) for lang in self._reqs}
+        else:
+            return {name: max(vers for vers, _ in origs.values())
+                    for name, origs in self._reqs[lang].items()
+                    if not any(isrt for _, isrt in origs.values())}
 
-    def runtime(self):
+    def runtime(self, lang = None):
         u"returns build and runtime dependencies"
-        return {lang: {name: version for name, (version, isrt) in mods.items() if isrt}
-                for lang, mods in self._reqs.items()}
+        if lang is None:
+            return {lang: self.runtime(lang) for lang in self._reqs}
+        else:
+            return {name: max(vers for vers, _ in origs.values())
+                    for name, origs in self._reqs[lang].items()
+                    if any(isrt for _, isrt in origs.values())}
 
-    def version(self, lang, name = None):
+    def version(self, lang, name = None, allorigs = False):
         u"returns the version of a package"
         if name is None:
+            if lang is None:
+                return deepcopy(self._reqs)
+
             return self._reqs.get(lang, None)
         else:
-            return self._reqs.get(lang, {}).get(name, [None])[0]
+            origs = self._reqs.get(lang, {}).get(name, None)
+            if origs is None:
+                return None
+            elif allorigs:
+                return origs
+            else:
+                return max(vers for vers, _ in origs.values())
 
     def __contains__(self, args):
         if isinstance(args, str):
@@ -140,21 +162,21 @@ class RequirementManager:
         else:
             return args[1] in self._reqs.get(args[0], tuple())
 
-def checkprogramversion(cnf, name, minver):
+def checkprogramversion(cnf:Context, name:str, minver:LooseVersion):
     u"check version of a program"
     cnf.find_program(name, var = name.upper())
     cmd    = [getattr(cnf.env, name.upper())[0], "--version"]
     found  = cnf.cmd_and_log(cmd).split('\n')
     found  = next((line for line in found if name in line.lower()), found[-1]).split()[-1]
     found  = found[found.rfind(' ')+1:].replace(',', '').strip()
-    if LooseVersion(found) < LooseVersion(minver):
+    if LooseVersion(found) < minver:
         cnf.fatal('The %s version is too old, expecting %r'%(name, minver))
 
 _REQ = RequirementManager()
 
-def requiredversion(lang, name = None):
+def requiredversion(lang, name = None, allorigs = False):
     u"whether an element is required"
-    return _REQ.version(lang, name)
+    return _REQ.version(lang, name, allorigs)
 
 def isrequired(lang, name = None):
     u"whether an element is required"
@@ -175,10 +197,27 @@ def check(cnf):
     u"checks whether the requirements are met"
     return _REQ.check(cnf)
 
-def buildonly():
+def buildonly(lang = None):
     u"returns build only dependencies"
-    return _REQ.buildonly()
+    return _REQ.buildonly(lang)
 
-def runtime():
+def requirements(stream = None):
+    u"prints requirements"
+    def _print(name, origs, tpe):
+        print(' -{:<20}{:<20}{:<}'
+              .format(name, str(max(vers for vers, _ in origs.values())), tpe),
+              file = stream)
+
+    for lang, names in requiredversion(None).items():
+        print('='*15, lang, file = stream)
+        for name, origs in names.items():
+            if not any(rti  for _, rti in origs.values()):
+                _print(name, origs, 'build')
+        for name, origs in names.items():
+            if any(rti  for _, rti in origs.values()):
+                _print(name, origs, '')
+        print('', file = stream)
+
+def runtime(lang = None):
     u"returns build and runtime dependencies"
-    return _REQ.runtime()
+    return _REQ.runtime(lang)

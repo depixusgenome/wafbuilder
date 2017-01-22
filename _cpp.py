@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 u"Default cpp for waf"
 import sys
+import re
 from typing             import Optional
 from distutils.version  import LooseVersion
 from waflib             import Utils
@@ -106,15 +107,19 @@ class Flags(Make):
 class Boost(Make):
     u"deal with cxx/ld flags"
     _H_ONLY = 'accumulators',
+
     @staticmethod
     def _getlibs():
         names = set()
         curr  = LooseVersion('0.0')
-        for name, (vers, _) in requiredversion('cpp').items():
-            if name.startswith('boost_'):
-                names.add(name.split('_')[-1])
-                if vers is not None and LooseVersion(vers) > curr:
-                    curr = LooseVersion(vers)
+        for name, origs in requiredversion('cpp', allorigs = False).items():
+            if not name.startswith('boost_'):
+                continue
+
+            names.add(name.split('_')[-1])
+            for vers, _ in origs.values():
+                if vers is not None and vers > curr:
+                    curr = vers
         return names, curr
 
     @classmethod
@@ -165,7 +170,7 @@ def check_cpp_compiler(cnf:Context, name:str, version:Optional[str]):
     elif isinstance(curr, tuple):
         curr = '.'.join(curr)
 
-    if LooseVersion(curr) < LooseVersion(version):
+    if LooseVersion(curr) < version:
         cnf.fatal(cnf.env['COMPILER_CXX']
                   +' version '+curr
                   +' should be greater than '+version)
