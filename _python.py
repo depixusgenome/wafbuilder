@@ -140,8 +140,9 @@ def pymoduledependencies(pysrc, name = None):
     patterns = tuple(re.compile(r'^\s*'+pat) for pat in
                      (r'from\s+([\w.]+)\s+import\s+', r'import\s*(\w+)'))
     mods     = set()
+    path     = lambda x: open(getattr(x, 'abspath', lambda: x)(), 'r')
     for item in pysrc:
-        with closing(open(item.abspath(), 'r')) as stream:
+        with closing(path(item)) as stream:
             for line in stream:
                 if 'import' not in line:
                     continue
@@ -182,11 +183,12 @@ def checkpy(bld:Context, name:str, items:Sequence):
         return
 
     pyext = set(bld.env.pyextmodules)
-    pyext.add(name)
+    if any(i.get_name() == name+':pyext' for i in bld.get_all_task_gen()):
+        pyext.add(name)
 
     deps = list(pymoduledependencies(items, name) & pyext)
     def _scan(_):
-        nodes = [bld.get_tgen_by_name(dep+'pyext').tasks[-1].outputs[0] for dep in deps]
+        nodes = [bld.get_tgen_by_name(dep+':pyext').tasks[-1].outputs[0] for dep in deps]
         return (nodes, [])
 
     def _checkencoding(tsk):
@@ -232,20 +234,25 @@ def checkpy(bld:Context, name:str, items:Sequence):
     if not requiredversion('python', 'mypy'):
         rules.pop(1)
 
+    def _build(item, kwargs):
+        bld(source = [item],
+            name   = str(item)+':'+kwargs['cls_keyword'](None).lower(),
+            **kwargs)
+
     if name in deps:
         for _, item in copytargets(bld, name, items):
             for kwargs in rules:
-                bld(source = [item], **kwargs)
+                _build(item, kwargs)
     else:
         for item in items:
             for kwargs in rules:
-                bld(source = [item], **kwargs)
+                _build(item, kwargs)
 
 def buildpymod(bld:Context, name:str, pysrc:Sequence):
     u"builds a python module"
     if len(pysrc) == 0:
         return
-    bld      (features = "py", source = pysrc)
+    bld      (name = str(bld.path)+":py", features = "py", source = pysrc)
     checkpy  (bld, name, pysrc)
     copyfiles(bld, name, pysrc)
 
@@ -270,6 +277,7 @@ def buildpyext(bld     : Context,
     node    = bld(features = 'subst',
                   source   = bld.srcnode.find_resource(__package__+'/_module.template'),
                   target   = name+"module.cpp",
+                  name     = str(bld.path)+":pybind11",
                   nsname   = name,
                   module   = mod,
                   version  = version)
@@ -278,7 +286,7 @@ def buildpyext(bld     : Context,
     args.setdefault('source',   csrc)
     args.setdefault('target',   parent.path_from(bldnode)+"/"+mod)
     args.setdefault('features', []).append('pyext')
-    args.setdefault('name',     name+"pyext")
+    args.setdefault('name',     name+":pyext")
 
     bld.shlib(**args)
 
@@ -291,8 +299,8 @@ def build_py(bld:Context, name:str, version:str, **kwargs):
     csrc   = bld.path.ant_glob('**/*.cpp')
     pysrc  = bld.path.ant_glob('**/*.py')
 
-    buildpymod(bld, name, pysrc)
     buildpyext(bld, name, version, pysrc, csrc, **kwargs)
+    buildpymod(bld, name, pysrc)
     copyfiles(bld,name,bld.path.ant_glob('**/*.ipynb'))
 
 def condaenv(name, reqs = None, stream = None):
@@ -316,5 +324,23 @@ def condaenv(name, reqs = None, stream = None):
             print(' - '+item[-1]+'::'+'='.join(item[:-1]), file = stream)
         else:
             print(' - '+'='.join(item), file = stream)
+
+def runtest(bld, *names):
+    u"runs tests"
+    pyext = set(bld.env.pyextmodules)
+    def _scan(_):
+        deps  = list(pymoduledependencies(names, None) & pyext)
+        nodes = [bld.get_tgen_by_name(dep+':pyext').tasks[-1].outputs[0] for dep in deps]
+        return (nodes, [])
+
+
+    for item in names:
+        bld(source      = [item],
+            name        = str(item)+':pytest',
+            always      = True,
+            color       = 'YELLOW',
+            rule        = '${PYTHON} -m pytest ${SRC} ',
+            scan        = _scan,
+            cls_keyword = lambda _: 'Pytest')
 
 addmissing(locals())

@@ -208,6 +208,10 @@ def copyfiles(bld:Context, arg, items:Sequence):
 
     copyroot(bld, arg).mkdir()
     for src, tgt in copytargets(bld, arg, items):
-        bld(rule = _cpy, source = [src], target = [tgt], cls_keyword = _kword)
+        bld(rule        = _cpy,
+            name        = str(src)+':'+_kword(None).lower(),
+            source      = [src],
+            target      = [tgt],
+            cls_keyword = _kword)
 
 
