@@ -1,0 +1,2 @@
+namespace @nsname@ { char const * __version__ = @version; }
+

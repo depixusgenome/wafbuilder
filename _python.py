@@ -10,7 +10,7 @@ from waflib.Configure   import conf
 from waflib.Context     import Context # type: ignore
 from waflib.Tools       import python as pytools # for correcting a bug
 
-from ._utils        import (YES, Make, addconfigure, runall,
+from ._utils        import (YES, Make, addconfigure, runall, copyargs,
                             addmissing, copyfiles, copytargets)
 from ._cpp          import Flags as CppFlags
 from ._requirements import (requirementcheck, isrequired, checkprogramversion,
@@ -269,7 +269,7 @@ def buildpyext(bld     : Context,
     if name not in bld.env.pyextmodules and not haspyext(csrc):
         return
 
-    args    = kwargs
+
     bldnode = bld.bldnode.make_node(bld.path.relpath())
     haspy   = len(pysrc)
     mod     = '_core'                         if haspy else name
@@ -283,6 +283,7 @@ def buildpyext(bld     : Context,
                   version  = version)
     csrc.append(node.target)
 
+    args = copyargs(kwargs)
     args.setdefault('source',   csrc)
     args.setdefault('target',   parent.path_from(bldnode)+"/"+mod)
     args.setdefault('features', []).append('pyext')
@@ -291,12 +292,12 @@ def buildpyext(bld     : Context,
     bld.shlib(**args)
 
 @conf
-def build_py(bld:Context, name:str, version:str, **kwargs):
+def build_python(bld:Context, name:str, version:str, **kwargs):
     u"builds a python module"
     if not isrequired('python'):
         return
 
-    csrc   = bld.path.ant_glob('**/*.cpp')
+    csrc   = kwargs.get('python_cpp', bld.path.ant_glob('**/*.cpp'))
     pysrc  = bld.path.ant_glob('**/*.py')
 
     buildpyext(bld, name, version, pysrc, csrc, **kwargs)

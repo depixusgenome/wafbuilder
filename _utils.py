@@ -214,4 +214,51 @@ def copyfiles(bld:Context, arg, items:Sequence):
             target      = [tgt],
             cls_keyword = _kword)
 
+def copyargs(kwa):
+    u"Copies args to make, discarding some specific to the latter"
+    args = dict(kwa)
+    for i in ('python_cpp', 'program', 'builders'):
+        args.pop(i, None)
+    return args
 
+def patch(locs):
+    u"""
+    patches a function already in locs.
+    For example:
+
+    >>> def configure(cnf):
+    >>>     print('this happens in between')
+    >>>
+    >>> @patch(locals())
+    >>> def post_configure(cnf):
+    >>>     print('this happens last')
+    >>>
+    >>> @patch(locals())
+    >>> def pre_configure(cnf):
+    >>>     print('this happens first')
+
+    """
+    def _wrapper(fcn):
+        name = fcn.__name__[fcn.__name__.find('_')+1:]
+        old  = locs.pop(name)
+        if fcn.__name__.startswith('post_'):
+            @wraps(fcn)
+            def _post_wrapped(*args, **kwa):
+                old(*args, **kwa)
+                return fcn(*args, **kwa)
+
+            locs[name] = _post_wrapped
+
+        elif fcn.startswith('pre_'):
+            @wraps(fcn)
+            def _pre_wrapped(*args, **kwa):
+                fcn(*args, **kwa)
+                return old(*args, **kwa)
+
+            locs[name] = _pre_wrapped
+
+        else:
+            raise AttributeError("Function name must be pre_/post_ ...")
+        return fcn
+
+    return _wrapper

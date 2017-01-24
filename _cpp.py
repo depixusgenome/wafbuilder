@@ -4,10 +4,12 @@ u"Default cpp for waf"
 import sys
 import re
 from typing             import Optional
+from contextlib         import closing
 from distutils.version  import LooseVersion
 from waflib             import Utils
+from waflib.Configure   import conf
 from waflib.Context     import Context
-from ._utils            import YES, runall, addmissing, Make
+from ._utils            import YES, runall, addmissing, Make, copyargs
 from ._requirements     import requirementcheck, isrequired, requiredversion
 
 IS_MAKE          = YES
@@ -185,5 +187,49 @@ def check_cpp_default(cnf:Context, name:str, version:Optional[str]):
                       uselib_store    = name,
                       args            = '--cflags --libs',
                       atleast_version = version)
+
+def hasmain(csrc):
+    u"detects whether a main function is declared"
+    pattern = re.compile(r'\s*int\s*main\s*(\s*int\s*\w+\s*,\s*(const\s*)?char\s')
+    for item in csrc:
+        with closing(open(item.abspath(), 'r')) as stream:
+            if any(pattern.match(line) is not None for line in stream):
+                return item
+    return None
+
+@conf
+def build_cpp(bld:Context, name:str, version:str, **kwargs):
+    u"builds a cpp extension"
+    csrc = bld.path.ant_glob('**/*.cpp', exclude = kwargs.get('python_cpp', []))
+    if len(csrc) == 0:
+        return
+
+    prog = hasmain(csrc)
+    csrc = [i for i in csrc if csrc is not prog]
+
+    args = copyargs(kwargs)
+    args.setdefault('target', bld.bldnode.path_from(bld.bldnode)+"/"+name)
+
+    def _template(post):
+        res = bld.srcnode.find_resource(__package__+'/_program.template')
+        return bld(features = 'subst',
+                   source   = res,
+                   target   = name+"_%sheader.cpp" % post,
+                   name     = str(bld.path)+":%sheader" % post,
+                   nsname   = name+'_'+post,
+                   version  = version).target
+
+    if len(csrc):
+        csrc.append(_template('lib'))
+        args['source'] = csrc
+        args['name']   = name+"_lib"
+        bld.shlib(**args)
+
+    if prog is not None:
+        args['source'] = [prog, _template('program')]
+        args['name']   = name+"_prog"
+        if len(csrc):
+            args.setdefault('use', []).append(name+'_lib')
+        bld.program(**args)
 
 addmissing(locals())

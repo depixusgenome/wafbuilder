@@ -10,7 +10,7 @@ from waflib.Build   import BuildContext
 
 from ._requirements import (require, check as _checkrequirements,
                             requiredversion, requirements)
-from ._utils        import addmissing, appname, copyfiles, runall
+from ._utils        import addmissing, appname, copyfiles, runall, patch
 from ._python       import checkpy, findpyext, condaenv, runtest
 from .              import _git as gitinfo
 
@@ -83,20 +83,30 @@ def addbuild(name:str, glob:dict):
     _fcn.__name__ = 'build_'+name[(name.rfind('/')+1) if '/' in name else 0:]
     glob[_fcn.__name__] = _fcn
 
+_DEFAULT = ['python']
+def default(*args):
+    u"Sets the default builder(s) to use: cpp, py or coffee"
+    _DEFAULT.clear()
+    _DEFAULT.extend(args)
+
 def make(glob, **kw):
     u"sets default values to wscript global variables"
+    def _get(name):
+        name = name.lower()
+        return 'cpp' if name == 'cxx' else ('python' if name == 'py' else name)
+
     def options(*_):
         u"does nothing"
-        for name in kw.get("builders", ['py']):
+        for name in kw.get("builders", _DEFAULT):
             try:
-                __import__(__name__+'.'+name)
+                __import__(__name__+'.'+_get(name))
             except ImportError:
                 pass
 
     def configure(cnf:Context):
         u"configures a python module"
-        for name in kw.get("builders", ['py']):
-            getattr(cnf, 'configure_'+name, lambda: None)()
+        for name in kw.get("builders", _DEFAULT):
+            getattr(cnf, 'configure_'+_get(name), lambda: None)()
 
     def build(bld:Context):
         u"builds a python module"
@@ -104,8 +114,8 @@ def make(glob, **kw):
         vers = glob['VERSION']
         kwa  = dict(kw)
         kwa .pop('builders', None)
-        for name in kw.get("builders", ['py']):
-            getattr(bld, 'build_'+name)(app, vers, **kwa)
+        for name in kw.get("builders", _DEFAULT):
+            getattr(bld, 'build_'+_get(name))(app, vers, **kwa)
 
     # pylint: disable=unnecessary-lambda
     toadd = dict(VERSION   = lambda: version(),
@@ -135,11 +145,11 @@ def recurse(builder, items):
         return _wrap
     return _wrapper
 
-
 addmissing(locals())
-def configure(cnf:Context, __old__ = locals().pop('configure')):
+
+@patch(locals())
+def post_configure(cnf:Context):
     u"Default configure"
-    __old__(cnf)
     _checkrequirements(cnf)
 
 __builtins__['make']    = make
