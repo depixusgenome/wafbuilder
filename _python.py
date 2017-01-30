@@ -13,8 +13,7 @@ from waflib.Tools       import python as pytools # for correcting a bug
 from ._utils        import (YES, Make, addconfigure, runall, copyargs,
                             addmissing, copyfiles, copytargets)
 from ._cpp          import Flags as CppFlags
-from ._requirements import (requirementcheck, isrequired, checkprogramversion,
-                            requiredversion, runtime)
+from ._requirements import REQ as requirements
 
 pytools.PYTHON_MODULE_TEMPLATE = '''
 import os, pkg_resources
@@ -50,7 +49,7 @@ def _store(cnf:Context, flg:str):
 def numpy(cnf:Context):
     u"tests numpy and obtains its headers"
     # modules are checked by parsing REQUIRE
-    if not isrequired('python', 'numpy'):
+    if ('python', 'numpy') not in requirements:
         return
 
     cmd = cnf.env.PYTHON[0]                                     \
@@ -64,7 +63,7 @@ class PyBind11(Make):
     _NAME = 'python', 'pybind11'
     @classmethod
     def options(cls, opt):
-        if not isrequired(*cls._NAME):
+        if cls._NAME not in requirements:
             return
 
         opt.get_option_group('Python Options')\
@@ -77,7 +76,7 @@ class PyBind11(Make):
     _DONE = False
     @classmethod
     def configure(cls, cnf):
-        if not isrequired(*cls._NAME) or cls._DONE:
+        if cls._NAME not in requirements or cls._DONE:
             return
         cls._DONE = True
 
@@ -108,30 +107,28 @@ class PyBind11(Make):
                       msg       = 'checking for pybind11',
                       mandatory = True)
 
-def loads():
+def toload(_:Context):
     u"returns python features to be loaded"
-    if not isrequired('python'):
-        return ""
-    return 'python'
+    return 'python' if 'python' in requirements else ''
 
 
-requirementcheck(lambda *_: None, lang = 'python', name = 'python')
+requirements.addcheck(lambda *_: None, lang = 'python', name = 'python')
 
-@requirementcheck
+@requirements.addcheck
 def check_python_default(cnf, name, version):
     u"Adds a default requirement checker"
     cond = 'ver >= num('+str(version).replace('.',',')+')'
     cnf.check_python_module(name.replace("python-", ""), condition = cond)
 
-requirementcheck(checkprogramversion, lang = 'python', name = 'pylint')
-requirementcheck(checkprogramversion, lang = 'python', name = 'mypy')
+requirements.addcheck(requirements.programversion, lang = 'python', name = 'pylint')
+requirements.addcheck(requirements.programversion, lang = 'python', name = 'mypy')
 
 @runall
 def configure(cnf:Context):
     u"get python headers and modules"
     if 'PYTHON_VERSION' in cnf.env:
         return
-    version = requiredversion('python', 'python')
+    version = requirements.version('python', 'python')
     cnf.check_python_version(tuple(int(val) for val in str(version).split('.')))
     cnf.check_python_headers()
 
@@ -228,10 +225,10 @@ def checkpy(bld:Context, name:str, items:Sequence):
                    cls_keyword = lambda _: 'PyLint'),
              ] # type: List
 
-    if not requiredversion('python', 'pylint'):
+    if ('python', 'pylint') not in requirements:
         rules.pop()
 
-    if not requiredversion('python', 'mypy'):
+    if ('python', 'mypy') not in requirements:
         rules.pop(1)
 
     def _build(item, kwargs):
@@ -294,7 +291,7 @@ def buildpyext(bld     : Context,
 @conf
 def build_python(bld:Context, name:str, version:str, **kwargs):
     u"builds a python module"
-    if not isrequired('python'):
+    if 'python' not in requirements:
         return
 
     csrc   = kwargs.get('python_cpp', bld.path.ant_glob('**/*.cpp'))
@@ -307,7 +304,7 @@ def build_python(bld:Context, name:str, version:str, **kwargs):
 def condaenv(name, reqs = None, stream = None):
     u"creates a conda yaml file"
     if reqs is None:
-        reqs = tuple(runtime('python').items())
+        reqs = tuple(requirements.runtime('python').items())
 
     pots = {i for i, _ in reqs}
     print('name: '+name, file = stream)

@@ -5,7 +5,7 @@ from distutils.version  import LooseVersion
 from copy               import deepcopy
 from typing             import (Dict, Set, Callable, # pylint: disable=unused-import
                                 Optional, Tuple, Iterable)
-from waflib.Context     import Context
+from waflib.Context     import Context, WSCRIPT_FILE
 from collections        import OrderedDict
 from ._utils            import appname
 
@@ -16,7 +16,7 @@ class RequirementManager:
         self._reqs   = OrderedDict() # Dict[str,Dict[str,Tuple[Optional[str,bool]]]]
         self._done   = False
 
-    def requirementcheck(self, fcn = None, lang = None, name = None):
+    def addcheck(self, fcn = None, lang = None, name = None):
         u"adds a means for checking an item"
         def _wrapper(item, lang = lang, name = name):
             self._done = False
@@ -122,6 +122,10 @@ class RequirementManager:
                 version = max(vers for vers, _ in origs.values())
                 fcns.get(name, default)(cnf, name, version)
 
+    def clear(self):
+        u"removes all requirements"
+        self._reqs.clear()
+
     def buildonly(self, lang = None):
         u"returns build only dependencies"
         if lang is None:
@@ -162,62 +166,41 @@ class RequirementManager:
         else:
             return args[1] in self._reqs.get(args[0], tuple())
 
-def checkprogramversion(cnf:Context, name:str, minver:LooseVersion):
-    u"check version of a program"
-    cnf.find_program(name, var = name.upper())
-    cmd    = [getattr(cnf.env, name.upper())[0], "--version"]
-    found  = cnf.cmd_and_log(cmd).split('\n')
-    found  = next((line for line in found if name in line.lower()), found[-1]).split()[-1]
-    found  = found[found.rfind(' ')+1:].replace(',', '').strip()
-    if LooseVersion(found) < minver:
-        cnf.fatal('The %s version is too old, expecting %r'%(name, minver))
+    @staticmethod
+    def programversion(cnf:Context, name:str, minver:LooseVersion):
+        u"check version of a program"
+        cnf.find_program(name, var = name.upper())
+        cmd    = [getattr(cnf.env, name.upper())[0], "--version"]
+        found  = cnf.cmd_and_log(cmd).split('\n')
+        found  = next((line for line in found if name in line.lower()), found[-1]).split()[-1]
+        found  = found[found.rfind(' ')+1:].replace(',', '').strip()
+        if LooseVersion(found) < minver:
+            cnf.fatal('The %s version is too old, expecting %r'%(name, minver))
 
-_REQ = RequirementManager()
+    def tostream(self, stream = None):
+        u"prints requirements"
+        def _print(name, origs, tpe):
+            print(' -{:<20}{:<20}{:<}'
+                  .format(name, str(max(vers for vers, _ in origs.values())), tpe),
+                  file = stream)
 
-def requiredversion(lang, name = None, allorigs = False):
-    u"whether an element is required"
-    return _REQ.version(lang, name, allorigs)
+        for lang, names in self.version(None).items():
+            print('='*15, lang, file = stream)
+            for name, origs in names.items():
+                if not any(rti  for _, rti in origs.values()):
+                    _print(name, origs, 'build')
+            for name, origs in names.items():
+                if any(rti  for _, rti in origs.values()):
+                    _print(name, origs, '')
+            print('', file = stream)
 
-def isrequired(lang, name = None):
-    u"whether an element is required"
-    if name is None:
-        return lang in _REQ
-    else:
-        return (lang, name) in _REQ
+    def reload(self, modules):
+        u"reloads the data"
+        self.clear()
+        for mod in modules:
+            fname = (mod+"/" if len(mod) else "")+WSCRIPT_FILE
+            with open(fname, 'r', encoding = 'utf-8') as stream:
+                src = u''.join(stream)
+                exec(compile(src, mod, 'exec')) # pylint: disable=exec-used
 
-def requirementcheck(fcn = None, lang = None, name = None):
-    u"adds a means for checking an item"
-    return _REQ.requirementcheck(fcn, lang, name)
-
-def require(lang = None, name = None, version = None, rtime = True, **kwa):
-    u"adds a requirement"
-    return _REQ.require(lang, name, version, rtime, **kwa)
-
-def check(cnf):
-    u"checks whether the requirements are met"
-    return _REQ.check(cnf)
-
-def buildonly(lang = None):
-    u"returns build only dependencies"
-    return _REQ.buildonly(lang)
-
-def requirements(stream = None):
-    u"prints requirements"
-    def _print(name, origs, tpe):
-        print(' -{:<20}{:<20}{:<}'
-              .format(name, str(max(vers for vers, _ in origs.values())), tpe),
-              file = stream)
-
-    for lang, names in requiredversion(None).items():
-        print('='*15, lang, file = stream)
-        for name, origs in names.items():
-            if not any(rti  for _, rti in origs.values()):
-                _print(name, origs, 'build')
-        for name, origs in names.items():
-            if any(rti  for _, rti in origs.values()):
-                _print(name, origs, '')
-        print('', file = stream)
-
-def runtime(lang = None):
-    u"returns build and runtime dependencies"
-    return _REQ.runtime(lang)
+REQ = RequirementManager()

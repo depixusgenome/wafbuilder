@@ -118,70 +118,33 @@ def addmissing(glob):
     u"adds functions 'load', 'options', 'configure', 'build' if missing from a module"
     items = tuple(makes(iter(cls for _, cls in glob.items())))
 
-    def load(_:Context):
-        u"applies load from all basic items"
-        return ' '.join(getattr(cls, 'loads', lambda:'')() for cls in items)
+    def toload(_:Context):
+        u"stacks loads from all basic items"
+        return ' '.join(getattr(cls, 'toload', lambda:'')(_) for cls in items)
 
-    def _load(opt:Context):
-        toload = glob.get('load', lambda _: None)(opt)
-        if len(toload):
-            opt.load(toload)
+    def load(opt:Context):
+        u"applies load from all basic items"
+        outp = glob.get('toload', lambda _: None)(opt)
+        if len(outp):
+            opt.load(outp)
 
     def options(opt:Context):
         u"applies options from all basic items"
-        _load(opt)
+        load(opt)
         run(opt, 'options', items)
 
     def configure(cnf:Context):
         u"applies configure from all basic items"
-        _load(cnf)
+        load(cnf)
         run(cnf, 'configure', items)
 
     def build(bld:Context):
         u"applies build from all basic items"
         run(bld, 'build', items)
 
-    for val in (load, options, configure, build):
+    for val in (load, toload, options, configure, build):
         val.__module__ = glob['__name__']
         glob.setdefault(val.__name__, val)
-
-def requirements(key):
-    u"""
-    Parses a REQUIRE file and returns elements associated to one key.
-
-    Such a file should be of the type:
-
-    > [PYTHON]
-    > python    3.5.2
-    > tornado   1.9.dev0
-    > [CXX]
-    > boost     1.62
-    """
-    info = dict()
-    def _getkey(line):
-        val  = line.replace('[', '').replace(']', '').strip().lower()
-        return 'cxx' if val == 'cpp' else val
-
-    key = _getkey(key)
-
-    with open('REQUIRE', 'r') as stream:
-        ignore = True
-        for line in stream:
-            line = line.strip()
-            if line.startswith('#') or len(line.strip()) == 0:
-                continue
-
-            if line.startswith("["):
-                ignore = _getkey(line) != key
-                continue
-
-            if ignore:
-                continue
-
-            vals      = iter(val.strip() for val in line.split(' '))
-            mod, vers = tuple(val        for val in vals if len(val))[:2]
-            info[mod] = vers.split('.')
-    return info
 
 def copyroot(bld:Context, arg):
     u"returns the root where items are copied"

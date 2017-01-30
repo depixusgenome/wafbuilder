@@ -10,7 +10,7 @@ from waflib             import Utils
 from waflib.Configure   import conf
 from waflib.Context     import Context
 from ._utils            import YES, runall, addmissing, Make, copyargs
-from ._requirements     import requirementcheck, isrequired, requiredversion
+from ._requirements     import REQ as requirements
 
 IS_MAKE          = YES
 CXX_OPTION_GROUP = 'C++ Options'
@@ -20,7 +20,7 @@ def _ismsvc(cnf:Context):
     return cnf.env['COMPILER_CXX'] == 'msvc'
 
 def _isrequired():
-    return isrequired('cpp')
+    return 'cpp' in requirements
 
 class Flags(Make):
     u"deal with cxx/ld flags"
@@ -114,7 +114,10 @@ class Boost(Make):
     def _getlibs():
         names = set()
         curr  = LooseVersion('0.0')
-        for name, origs in requiredversion('cpp', allorigs = False).items():
+        req   = requirements.version('cpp', allorigs = False)
+        if req is None:
+            return
+        for name, origs in req.items():
             if not name.startswith('boost_'):
                 continue
 
@@ -125,23 +128,21 @@ class Boost(Make):
         return names, curr
 
     @classmethod
-    def options(cls, opt:Context):
-        u"setup options"
-        if len(cls._getlibs()[0]):
-            opt.load('boost')
+    def toload(cls, _:Context):
+        u"returns boost feature if required"
+        return 'boost' if len(cls._getlibs()[0]) else ''
 
     @classmethod
     def configure(cls, cnf:Context):
         u"setup configure"
         libs, vers = cls._getlibs()
         if len(libs):
-            cnf.load('boost')
             cnf.check_boost(lib = ' '.join(libs-set(cls._H_ONLY)), mandatory = True)
             if LooseVersion(cnf.env.BOOST_VERSION.replace('_', '.')) < vers:
                 cnf.fatal('Boost version is too old: %s < %s'
                           % (str(vers), str(cnf.env.BOOST_VERSION)))
 
-def loads():
+def toload(_:Context):
     u"returns all features needed by cpp"
     if not _isrequired():
         return ''
@@ -150,7 +151,8 @@ def loads():
 
     if sys.platform == "win32":
         load += ' msvc'
-    return load
+
+    return ' '.join((load, Boost.toload(_)))
 
 @runall
 def options(opt:Context):
@@ -158,7 +160,7 @@ def options(opt:Context):
     if _isrequired():
         opt.add_option_group(CXX_OPTION_GROUP)
 
-@requirementcheck(lang = 'cxx', name = COMPILERS)
+@requirements.addcheck(lang = 'cxx', name = COMPILERS)
 def check_cpp_compiler(cnf:Context, name:str, version:Optional[str]):
     u"checks the compiler version"
     if cnf.env['COMPILER_CXX'] != name:
@@ -177,7 +179,7 @@ def check_cpp_compiler(cnf:Context, name:str, version:Optional[str]):
                   +' version '+curr
                   +' should be greater than '+version)
 
-@requirementcheck
+@requirements.addcheck
 def check_cpp_default(cnf:Context, name:str, version:Optional[str]):
     u"Adds a requirement checker"
     if name.startswith('boost'):

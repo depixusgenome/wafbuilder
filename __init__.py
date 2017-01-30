@@ -8,8 +8,7 @@ from functools  import wraps
 from waflib.Context import Context
 from waflib.Build   import BuildContext
 
-from ._requirements import (require, check as _checkrequirements,
-                            requiredversion, requirements)
+from ._requirements import REQ as requirements
 from ._utils        import addmissing, appname, copyfiles, runall, patch
 from ._python       import checkpy, findpyext, condaenv, runtest
 from .              import _git as gitinfo
@@ -98,10 +97,7 @@ def make(glob, **kw):
     def options(*_):
         u"does nothing"
         for name in kw.get("builders", _DEFAULT):
-            try:
-                __import__(__name__+'.'+_get(name))
-            except ImportError:
-                pass
+            __import__(__name__+'._'+_get(name))
 
     def configure(cnf:Context):
         u"configures a python module"
@@ -150,7 +146,7 @@ addmissing(locals())
 @patch(locals())
 def post_configure(cnf:Context):
     u"Default configure"
-    _checkrequirements(cnf)
+    requirements.check(cnf)
 
 __builtins__['make']    = make
-__builtins__['require'] = require
+__builtins__['require'] = requirements.require
