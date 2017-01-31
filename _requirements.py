@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u"Dealing with requirements"
+import re
 from distutils.version  import LooseVersion
 from copy               import deepcopy
 from typing             import (Dict, Set, Callable, # pylint: disable=unused-import
@@ -115,12 +116,21 @@ class RequirementManager:
         for lang in self._reqs:
             cnf.load(__package__+'._'+lang)
 
+        defaults = {lang: self._checks[lang].get('default', lambda *x: None)
+                    for lang in self._reqs}
+
+        def _get(lang, name):
+            version = max(vers for vers, _ in self._reqs[lang][name].values())
+            self._checks[lang].get(name, defaults[lang])(cnf, name, version)
+
         for lang, items in self._reqs.items():
-            fcns    = self._checks[lang]
-            default = fcns.get('default', lambda *x: None)
-            for name, origs in items.items():
-                version = max(vers for vers, _ in origs.values())
-                fcns.get(name, default)(cnf, name, version)
+            if lang in items:
+                _get(lang, lang)
+
+        for lang, items in self._reqs.items():
+            for name in items:
+                if name != lang:
+                    _get(lang, name)
 
     def clear(self):
         u"removes all requirements"
@@ -162,9 +172,13 @@ class RequirementManager:
 
     def __contains__(self, args):
         if isinstance(args, str):
-            return args in self._reqs
+            return (args in self._reqs
+                    or any(re.match(args, name) for name in self._reqs))
+        elif args[0] not in self._reqs:
+            return False
         else:
-            return args[1] in self._reqs.get(args[0], tuple())
+            mods = self._reqs[args[0]]
+            return (args[1] in mods or any(re.match(args[1], name) for name in mods))
 
     @staticmethod
     def programversion(cnf:Context, name:str, minver:LooseVersion):

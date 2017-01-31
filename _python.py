@@ -80,6 +80,7 @@ class PyBind11(Make):
             return
         cls._DONE = True
 
+        check_python(cnf, 'python', requirements.version('python', 'python'))
         if cnf.options.pybind11 is not None:
             _store(cnf, '-I'+cnf.options.pybind11)
 
@@ -111,8 +112,13 @@ def toload(_:Context):
     u"returns python features to be loaded"
     return 'python' if 'python' in requirements else ''
 
-
-requirements.addcheck(lambda *_: None, lang = 'python', name = 'python')
+@requirements.addcheck
+def check_python(cnf, _, version):
+    u"checks the python version when necessary"
+    if 'PYTHON_VERSION' in cnf.env:
+        return
+    cnf.check_python_version(tuple(int(val) for val in str(version).split('.')))
+    cnf.check_python_headers()
 
 @requirements.addcheck
 def check_python_default(cnf, name, version):
@@ -124,13 +130,9 @@ requirements.addcheck(requirements.programversion, lang = 'python', name = 'pyli
 requirements.addcheck(requirements.programversion, lang = 'python', name = 'mypy')
 
 @runall
-def configure(cnf:Context):
+def configure(_:Context):
     u"get python headers and modules"
-    if 'PYTHON_VERSION' in cnf.env:
-        return
-    version = requirements.version('python', 'python')
-    cnf.check_python_version(tuple(int(val) for val in str(version).split('.')))
-    cnf.check_python_headers()
+    pass
 
 def pymoduledependencies(pysrc, name = None):
     u"detects dependencies"
@@ -331,14 +333,12 @@ def runtest(bld, *names):
         nodes = [bld.get_tgen_by_name(dep+':pyext').tasks[-1].outputs[0] for dep in deps]
         return (nodes, [])
 
-
-    for item in names:
-        bld(source      = [item],
-            name        = str(item)+':pytest',
-            always      = True,
-            color       = 'YELLOW',
-            rule        = '${PYTHON} -m pytest ${SRC} ',
-            scan        = _scan,
-            cls_keyword = lambda _: 'Pytest')
+    bld(source      = names,
+        name        = 'pytests',
+        always      = True,
+        color       = 'YELLOW',
+        rule        = '${PYTHON} -m pytest ${SRC} ',
+        scan        = _scan,
+        cls_keyword = lambda _: 'Pytest')
 
 addmissing(locals())

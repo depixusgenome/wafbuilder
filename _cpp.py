@@ -3,6 +3,7 @@
 u"Default cpp for waf"
 import sys
 import re
+from   pathlib          import Path
 from typing             import Optional
 from contextlib         import closing
 from distutils.version  import LooseVersion
@@ -148,9 +149,11 @@ def toload(_:Context):
         return ''
 
     load = 'compiler_cxx'
-
     if sys.platform == "win32":
         load += ' msvc'
+
+    if ('cpp', 'python_.*') in requirements:
+        load += ' python'
 
     return ' '.join((load, Boost.toload(_)))
 
@@ -184,6 +187,20 @@ def check_cpp_default(cnf:Context, name:str, version:Optional[str]):
     u"Adds a requirement checker"
     if name.startswith('boost'):
         return
+    elif name.startswith('python_'):
+        base = name[len('python_'):]
+        cond = 'ver >= num('+str(version).replace('.',',')+')'
+        cnf.check_python_module(base, condition = cond)
+
+        line = (' -I'   + cnf.env.INCLUDES_PYEXT[0]
+                + ' -L' + cnf.env.LIBPATH_PYEXT[0]
+                + ' -l' + base + ' -lm')
+
+        libs = (pre+base+suf for pre in ('', 'lib') for suf in ('.so', '.dll'))
+        if not any((Path(cnf.env.LIBPATH_PYEXT[0]) / lib).exists() for lib in libs):
+            line = line.replace('-l'+base, '')
+
+        cnf.parse_flags(line, uselib_store = base)
     else:
         cnf.check_cfg(package         = name,
                       uselib_store    = name,
