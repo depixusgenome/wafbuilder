@@ -34,7 +34,7 @@ class Flags(Make):
         copt = opt.add_option_group(CXX_OPTION_GROUP)
         copt.add_option('--cxxflags',
                         dest    = 'cxxflaglist',
-                        default = '-std=c++14 -fopenmp -g',
+                        default = '-std=c++14 -g',
                         action  = 'store',
                         help    = 'define cxx flags')
         copt.add_option('--linkflags',
