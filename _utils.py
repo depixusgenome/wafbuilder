@@ -148,7 +148,7 @@ def addmissing(glob):
 
 def copyroot(bld:Context, arg):
     u"returns the root where items are copied"
-    return bld.bldnode.make_node('/'+arg) if isinstance(arg, str) else arg
+    return bld.bldnode.make_node(arg) if isinstance(arg, str) else arg
 
 def copytargets(bld:Context, arg, items):
     u"yields source and targets for copied files"
