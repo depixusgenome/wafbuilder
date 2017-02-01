@@ -114,13 +114,31 @@ def addoptions(fcn):
     u"adds an option element to a context"
     return _add(fcn, 'options')
 
+_REC     = 0
+_LOADED  = {}
+def loading(cnf, vals):
+    "keeps track of loaded items so as not to do the job twice"
+    global _REC
+    if not isinstance(vals, str):
+        _REC += 1
+        vals = ' '.join(vals)
+        _REC -= 1
+    vals = set(vals.split(' ')) - _LOADED.get(id(cnf), set())
+    if _REC == 0:
+        _LOADED.setdefault(id(cnf), set()).update(vals)
+    return ' '.join(vals)
+
 def addmissing(glob):
     u"adds functions 'load', 'options', 'configure', 'build' if missing from a module"
     items = tuple(makes(iter(cls for _, cls in glob.items())))
 
-    def toload(_:Context):
+    def toload(cnf:Context):
         u"stacks loads from all basic items"
-        return ' '.join(getattr(cls, 'toload', lambda:'')(_) for cls in items)
+        global _REC
+        _REC += 1
+        args = (getattr(cls, 'toload', lambda:'')(cnf) for cls in items)
+        _REC -= 1
+        return loading(cnf, args)
 
     def load(opt:Context):
         u"applies load from all basic items"
