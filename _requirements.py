@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u"Dealing with requirements"
-import re
 from collections        import OrderedDict
 from distutils.version  import LooseVersion
 from copy               import deepcopy
@@ -184,9 +183,8 @@ class RequirementManager:
     @staticmethod
     def programversion(cnf:Context, name:str, minver:LooseVersion, reg = None):
         u"check version of a program"
-        if reg is None or isinstance(reg, str):
-            areg = re.compile(r"(^|.*\s)%s(\s.*|$)" % (name if reg is None else reg),
-                              flags = re.IGNORECASE)
+        if reg is None:
+            areg = name
         else:
             areg = reg
 
@@ -195,8 +193,9 @@ class RequirementManager:
 
         found  = cnf.cmd_and_log(cmd).split('\n')
         found  = [line for line in found if len(line)]
-        found  = next((line for line in found if areg.match(line)), found[-1]).split()[-1]
+        found  = next((line for line in found if areg in line), found[-1]).split()[-1]
         found  = found[found.rfind(' ')+1:].replace(',', '').strip()
+        print(type(found),found)
         if LooseVersion(found) < minver:
             if reg is None:
                 cnf.fatal('The %s version is too old, expecting %r'%(name, minver))
