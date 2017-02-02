@@ -127,7 +127,18 @@ def check_python_default(cnf, name, version):
     cnf.check_python_module(name.replace("python-", ""), condition = cond)
 
 requirements.addcheck(requirements.programversion, lang = 'python', name = 'pylint')
-requirements.addcheck(requirements.programversion, lang = 'python', name = 'mypy')
+
+@requirements.addcheck
+def check_python_astroid(cnf, name, version):
+    u"checks pylint's astroid version"
+    requirements.programversion(cnf, 'pylint', version, reg = name)
+
+@requirements.addcheck
+def check_python_mypy(cnf, name, version):
+    u"checks python's mypy"
+    requirements.programversion(cnf, name, version)
+    cmd = [getattr(cnf.env, name.upper())[0], "--fast-parser", "-c", '"print(1)"']
+    cnf.cmd_and_log(cmd)
 
 @runall
 def configure(_:Context):

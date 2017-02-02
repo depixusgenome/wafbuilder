@@ -2,12 +2,12 @@
 # -*- coding: utf-8 -*-
 u"Dealing with requirements"
 import re
+from collections        import OrderedDict
 from distutils.version  import LooseVersion
 from copy               import deepcopy
 from typing             import (Dict, Set, Callable, # pylint: disable=unused-import
                                 Optional, Tuple, Iterable)
 from waflib.Context     import Context, WSCRIPT_FILE
-from collections        import OrderedDict
 from ._utils            import appname
 
 class RequirementManager:
@@ -178,18 +178,31 @@ class RequirementManager:
             return False
         else:
             mods = self._reqs[args[0]]
-            return (args[1] in mods or any(re.match(args[1], name) for name in mods))
+            return (args[1] in mods
+                    or any(re.match(args[1], name) for name in mods))
 
     @staticmethod
-    def programversion(cnf:Context, name:str, minver:LooseVersion):
+    def programversion(cnf:Context, name:str, minver:LooseVersion, reg = None):
         u"check version of a program"
+        if reg is None or isinstance(reg, str):
+            areg = re.compile(r"(^|.*\s)%s(\s.*|$)" % (name if reg is None else reg),
+                              flags = re.IGNORECASE)
+        else:
+            areg = reg
+
         cnf.find_program(name, var = name.upper())
         cmd    = [getattr(cnf.env, name.upper())[0], "--version"]
+
         found  = cnf.cmd_and_log(cmd).split('\n')
-        found  = next((line for line in found if name in line.lower()), found[-1]).split()[-1]
+        found  = [line for line in found if len(line)]
+        found  = next((line for line in found if areg.match(line)), found[-1]).split()[-1]
         found  = found[found.rfind(' ')+1:].replace(',', '').strip()
         if LooseVersion(found) < minver:
-            cnf.fatal('The %s version is too old, expecting %r'%(name, minver))
+            if reg is None:
+                cnf.fatal('The %s version is too old, expecting %r'%(name, minver))
+            else:
+                cnf.fatal('The %s (%s) version is too old, expecting %r'
+                          %(name, str(reg), minver))
 
     def tostream(self, stream = None):
         u"prints requirements"
