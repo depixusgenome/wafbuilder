@@ -10,7 +10,7 @@ from distutils.version  import LooseVersion
 from waflib             import Utils
 from waflib.Configure   import conf
 from waflib.Context     import Context
-from ._utils            import YES, runall, addmissing, Make, copyargs
+from ._utils            import YES, runall, addmissing, Make, copyargs, loading
 from ._requirements     import REQ as requirements
 
 IS_MAKE          = YES
@@ -34,7 +34,7 @@ class Flags(Make):
         copt = opt.add_option_group(CXX_OPTION_GROUP)
         copt.add_option('--cxxflags',
                         dest    = 'cxxflaglist',
-                        default = '-std=c++14 -fopenmp -g',
+                        default = '-std=c++14 -g',
                         action  = 'store',
                         help    = 'define cxx flags')
         copt.add_option('--linkflags',
@@ -104,7 +104,6 @@ class Flags(Make):
         cnf.env.append_unique('CXXFLAGS',  Utils.to_list(cxx))
         cnf.env.append_unique('LINKFLAGS', Utils.to_list(links))
         cnf.env.append_unique('INCLUDES',  ['../'])
-
         cnf.env.append_unique('CXXFLAGS', warnings)
 
 class Boost(Make):
@@ -143,7 +142,7 @@ class Boost(Make):
                 cnf.fatal('Boost version is too old: %s < %s'
                           % (str(vers), str(cnf.env.BOOST_VERSION)))
 
-def toload(_:Context):
+def toload(cnf:Context):
     u"returns all features needed by cpp"
     if not _isrequired():
         return ''
@@ -155,7 +154,7 @@ def toload(_:Context):
     if ('cpp', 'python_.*') in requirements:
         load += ' python'
 
-    return ' '.join((load, Boost.toload(_)))
+    return loading(cnf, ' '.join((load, Boost.toload(cnf))))
 
 @runall
 def options(opt:Context):
