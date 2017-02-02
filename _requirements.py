@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u"Dealing with requirements"
+import re
 from collections        import OrderedDict
 from distutils.version  import LooseVersion
 from copy               import deepcopy
@@ -195,7 +196,6 @@ class RequirementManager:
         found  = [line for line in found if len(line)]
         found  = next((line for line in found if areg in line), found[-1]).split()[-1]
         found  = found[found.rfind(' ')+1:].replace(',', '').strip()
-        print(type(found),found)
         if LooseVersion(found) < minver:
             if reg is None:
                 cnf.fatal('The %s version is too old, expecting %r'%(name, minver))
