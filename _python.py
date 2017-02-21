@@ -3,6 +3,7 @@
 u"All *basic* python related details"
 import subprocess
 import re
+import sys
 
 from typing             import Sequence, List
 from contextlib         import closing
@@ -219,7 +220,12 @@ def checkpy(bld:Context, name:str, items:Sequence):
         if len(msg):
             bld.fatal('In file %s:\n\t- ' % tsk.inputs[0].abspath()+msg)
 
-    mypy   = '${MYPY} ${SRC} --silent-imports --fast-parser'
+    if sys.version.startswith("3.5"):
+        mypy   = '${MYPY} ${SRC} --silent-imports --fast-parser'
+    else:
+        mypy   = ('${MYPY} ${SRC}  --ignore-missing-imports '
+                  +'--follow-imports=skip --fast-parser')
+
     pylint = ('${PYLINT} ${SRC} '
               + '--init-hook="sys.path.append(\'./\')" '
               + '--msg-template="{path}:{line}:{column}:{C}: [{symbol}] {msg}" '
@@ -352,4 +358,4 @@ def runtest(bld, *names):
         scan        = _scan,
         cls_keyword = lambda _: 'Pytest')
 
-addmissing(locals())
+addmissing()

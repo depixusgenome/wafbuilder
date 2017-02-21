@@ -1,15 +1,15 @@
-#!/usr/bin/env python3
+#l!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u"Default functions for waf"
 import os
-from typing     import Sequence, Callable
+from typing     import Sequence, Callable, Optional
 from functools  import wraps
 
 from waflib.Context import Context
 from waflib.Build   import BuildContext
 
 from ._requirements import REQ as requirements
-from ._utils        import addmissing, appname, copyfiles, runall, patch
+from ._utils        import addmissing, appname, copyfiles, runall, patch, getlocals
 from ._python       import checkpy, findpyext, condaenv, runtest
 from .              import _git as gitinfo
 
@@ -50,8 +50,14 @@ def register(name:str, fcn:Callable[[Context], None], glob:dict):
 
     glob['build_'+name] = _single
 
-def addbuild(name:str, glob:dict):
+def addbuild(name:str, glob:Optional[dict] = None):
     u"Registers a command from a child wscript"
+    glob = getlocals(glob)
+    if isinstance(name, (tuple, list)):
+        for i in name:
+            addbuild(i, glob)
+        return
+
     def _fcn(bld):
         bld.recurse(name)
     _fcn.__doc__  = u'Build module "{}"'.format(name)
@@ -88,8 +94,10 @@ def default(*args):
     _DEFAULT.clear()
     _DEFAULT.extend(args)
 
-def make(glob, **kw):
+def make(glob = None, **kw):
     u"sets default values to wscript global variables"
+    glob = getlocals(glob)
+
     def _get(name):
         name = name.lower()
         return 'cpp' if name == 'cxx' else ('python' if name == 'py' else name)
@@ -141,12 +149,13 @@ def recurse(builder, items):
         return _wrap
     return _wrapper
 
-addmissing(locals())
+addmissing()
 
-@patch(locals())
-def post_configure(cnf:Context):
+@patch
+def postfix_configure(cnf:Context):
     u"Default configure"
     requirements.check(cnf)
 
 __builtins__['make']    = make
 __builtins__['require'] = requirements.require
+__builtins__['patch']   = patch

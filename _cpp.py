@@ -250,4 +250,4 @@ def build_cpp(bld:Context, name:str, version:str, **kwargs):
             args.setdefault('use', []).append(name+'_lib')
         bld.program(**args)
 
-addmissing(locals())
+addmissing()

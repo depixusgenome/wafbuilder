@@ -3,7 +3,6 @@
 u"Default utils for waf"
 import inspect
 import shutil
-import subprocess
 from typing         import (Iterator, Callable, # pylint: disable=unused-import
                             Iterable, Union, Sequence, cast)
 from types          import ModuleType, FunctionType
@@ -16,6 +15,14 @@ YES = type('YES', (object,), dict(__doc__ = u"Used as a typed enum"))()
 def _add(fcn, name : str):
     fname = getattr(fcn, '__func__', fcn).__name__
     return type(fname[0].upper()+fname[1:]+'Make', (Make,), {name: fcn})
+
+def getlocals(glob = None, ind = 1) -> dict:
+    u"returns locals from an upper frame"
+    if isinstance(ind, dict) or isinstance(glob, int):
+        ind, glob = glob, ind
+    if glob is None:
+        return inspect.stack()[ind+1][0].f_locals
+    return glob
 
 def appname(iframe: int  = None) -> str:
     u"returns directory"
@@ -128,8 +135,9 @@ def loading(cnf, vals):
         _LOADED.setdefault(id(cnf), set()).update(vals)
     return ' '.join(vals)
 
-def addmissing(glob):
+def addmissing(glob = None):
     u"adds functions 'load', 'options', 'configure', 'build' if missing from a module"
+    glob  = getlocals(glob)
     items = tuple(makes(iter(cls for _, cls in glob.items())))
 
     def toload(cnf:Context):
@@ -202,7 +210,7 @@ def copyargs(kwa):
         args.pop(i, None)
     return args
 
-def patch(locs):
+def patch(arg = None, locs = None):
     u"""
     patches a function already in locs.
     For example:
@@ -210,36 +218,61 @@ def patch(locs):
     >>> def configure(cnf):
     >>>     print('this happens in between')
     >>>
-    >>> @patch(locals())
-    >>> def post_configure(cnf):
-    >>>     print('this happens last')
+    >>> @patch
+    >>> def configure(cnf):
+    >>>     print('this happens last!')
     >>>
-    >>> @patch(locals())
-    >>> def pre_configure(cnf):
-    >>>     print('this happens first')
-
+    >>> @patch('postfix')
+    >>> def configure(cnf):
+    >>>     print('this happens last!')
+    >>>
+    >>> @patch
+    >>> def postfix_configure(cnf):
+    >>>     print('this happens last!')
+    >>>
+    >>> @patch('prefix')
+    >>> def configure(cnf):
+    >>>     print('this happens first!')
+    >>>
+    >>> @patch
+    >>> def prefix_configure(cnf):
+    >>>     print('this happens first!')
     """
+    locs = getlocals()
     def _wrapper(fcn):
-        name = fcn.__name__[fcn.__name__.find('_')+1:]
-        old  = locs.pop(name)
-        if fcn.__name__.startswith('post_'):
-            @wraps(fcn)
-            def _post_wrapped(*args, **kwa):
-                old(*args, **kwa)
-                return fcn(*args, **kwa)
+        name = fcn.__name__
+        pre  = name.startswith('pre_') or name.startswith('prefix_')
+        if pre and (str(arg).lower() == 'postfix'):
+            raise KeyError("incompatible requests")
 
-            locs[name] = _post_wrapped
+        post = name.startswith('post_') or name.startswith('postfix_')
+        if post and (str(arg).lower() == 'prefix'):
+            raise KeyError("incompatible requests")
 
-        elif fcn.startswith('pre_'):
+        if pre or str(arg).lower() == 'prefix':
+            if name.startswith('pre_') or name.startswith('prefix_'):
+                name = name[name.find('_')+1:]
+            old  = locs.pop(name)
+
             @wraps(fcn)
             def _pre_wrapped(*args, **kwa):
                 fcn(*args, **kwa)
                 return old(*args, **kwa)
 
             locs[name] = _pre_wrapped
-
         else:
-            raise AttributeError("Function name must be pre_/post_ ...")
+            if name.startswith('post_') or name.startswith('postfix_'):
+                name = name[name.find('_')+1:]
+            old  = locs.pop(name)
+
+            @wraps(fcn)
+            def _post_wrapped(*args, **kwa):
+                old(*args, **kwa)
+                return fcn(*args, **kwa)
+
+            locs[name] = _post_wrapped
         return fcn
 
+    if callable(arg):
+        return _wrapper(arg)
     return _wrapper

@@ -97,9 +97,7 @@ conda list
 
 Simply add:
 ~~~
-#! /usr/bin/env python
-# encoding: utf-8
-make(locals())
+make()
 ~~~
 
 The *wafbuilder* will set things up automatically.
@@ -108,7 +106,7 @@ The *wafbuilder* will set things up automatically.
 
 The file then looks like:
 ~~~
-make(locals(), builders = ['py', 'coffee'])
+make(builders = ['py', 'coffee'])
 ~~~
 
 The *configure* function will look for coffeescript and check its version. The 
@@ -187,7 +185,6 @@ def requirements(_):
 
 # the following creates specific build functions for all
 # sub-directories. Do 'python3 waf --help' to see this
-for item in _ALL:
-    builder.addbuild(item, locals())
+builder.addbuild(_ALL)
 ~~~
 
