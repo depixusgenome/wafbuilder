@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 u"Default functions for waf"
 import os
-from typing     import Sequence, Callable, Optional
+from typing     import Sequence, Callable, Optional, Dict # pylint: disable=unused-import
 from functools  import wraps
 
 from waflib.Context import Context
@@ -11,14 +11,48 @@ from waflib.Build   import BuildContext
 from ._requirements import REQ as requirements
 from ._utils        import addmissing, appname, copyfiles, runall, patch, getlocals
 from ._python       import checkpy, findpyext, condaenv, runtest
-from .              import _git as gitinfo
+from ._git          import version as _gitversion
+
+_DEFAULT_WAFS = {} # type: Dict[str, str]
 
 def wscripted(path) -> Sequence[str]:
     u"return subdirs with wscript in them"
     path = path.replace("\\", "/")
     if not path.endswith("/"):
         path += "/"
-    return [path+x for x in os.listdir(path) if os.path.exists(path+x+"/wscript")]
+    return [path+x for x in os.listdir(path)
+            if (os.path.exists(path+x+"/wscript")
+                or os.path.abspath(path+x)+"/wscript" in _DEFAULT_WAFS)]
+
+def defaultwaf(path, code):
+    u"Defines default wscripts in a directory"
+    import waflib.Utils as _Utils
+    if not getattr(_Utils, '__wafbuilder_monkeypatch__', False):
+        _Utils.__wafbuilder_monkeypatch__ = True
+
+        @wraps(_Utils.readf)
+        def _read(fname, *args, __old__ = _Utils.readf, **kwa):
+            code = _DEFAULT_WAFS.get(fname.replace("\\", "/"), None)
+            if code is not None and not os.path.exists(fname):
+                return code
+            return __old__(fname, *args, **kwa)
+        _Utils.readf = _read
+
+        from waflib.Node import Node
+        @wraps(Node.exists)
+        def _exists(self, *_, __old__ = Node.exists):
+            if self.abspath().replace("\\", "/") in _DEFAULT_WAFS:
+                return True
+            else:
+                return __old__(self)
+        Node.exists = _exists
+
+    path = path.replace("\\", "/")
+    if not path.endswith("/"):
+        path += "/"
+
+    dirs = [os.path.abspath(path+x)+"/wscript" for x in os.listdir(path)]
+    _DEFAULT_WAFS.update((i, code) for i in dirs)
 
 def top()-> str:
     u"returns top path"
@@ -33,7 +67,7 @@ def output() -> str:
 def version() -> str:
     u"returns git tag"
     try:
-        return gitinfo.version()
+        return _gitversion()
     except:             # pylint: disable=bare-except
         return "0.0.1"
 
@@ -156,6 +190,6 @@ def postfix_configure(cnf:Context):
     u"Default configure"
     requirements.check(cnf)
 
-__builtins__['make']    = make
-__builtins__['require'] = requirements.require
-__builtins__['patch']   = patch
+__builtins__['make']    = make                  # type: ignore
+__builtins__['require'] = requirements.require  # type: ignore
+__builtins__['patch']   = patch                 # type: ignore
