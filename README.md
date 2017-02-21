@@ -102,6 +102,13 @@ make()
 
 The *wafbuilder* will set things up automatically.
 
+This is not even required should there be a line as follows in the main *wscript*:
+~~~
+import wafbuilder as builder
+builder.defaultwscript("src") # all children directories in 'src' have a default wscript
+~~~
+
+
 ## Adding coffeescript support
 
 The file then looks like:

@@ -24,8 +24,11 @@ def wscripted(path) -> Sequence[str]:
             if (os.path.exists(path+x+"/wscript")
                 or os.path.abspath(path+x)+"/wscript" in _DEFAULT_WAFS)]
 
-def defaultwaf(path, code):
-    u"Defines default wscripts in a directory"
+def defaultwscript(path, code = 'make()'):
+    u"""
+    Defines default wscripts for all children in a directory.
+    This is dynamic.
+    """
     import waflib.Utils as _Utils
     if not getattr(_Utils, '__wafbuilder_monkeypatch__', False):
         _Utils.__wafbuilder_monkeypatch__ = True
