@@ -8,6 +8,7 @@ from copy               import deepcopy
 from typing             import (Dict, Set, Callable, # pylint: disable=unused-import
                                 Optional, Tuple, Iterable)
 from waflib.Context     import Context, WSCRIPT_FILE
+from ._defaults         import reload as _reload
 from ._utils            import appname
 
 class RequirementManager:
@@ -223,10 +224,6 @@ class RequirementManager:
     def reload(self, modules):
         u"reloads the data"
         self.clear()
-        for mod in modules:
-            fname = (mod+"/" if len(mod) else "")+WSCRIPT_FILE
-            with open(fname, 'r', encoding = 'utf-8') as stream:
-                src = u''.join(stream)
-                exec(compile(src, mod, 'exec')) # pylint: disable=exec-used
+        _reload(modules)
 
 REQ = RequirementManager()
