@@ -2,6 +2,8 @@
 # -*- coding: utf-8 -*-
 u"All *basic* python related details"
 import subprocess
+import urllib.request as request
+import tempfile
 import re
 import sys
 
@@ -45,6 +47,23 @@ IS_MAKE = YES
 def _store(cnf:Context, flg:str):
     for item in 'PYEXT', 'PYEMBED':
         cnf.parse_flags(flg, uselib_store=item)
+
+def setup_conda(envname):
+    u"Installs conda"
+    try:
+        subprocess.check_output(['conda', '--version'])
+    except: # pylint: disable=bare-except
+        islin = sys.platform == 'linux'
+        site  = "https://repo.continuum.io/miniconda/Miniconda3-latest-"
+        site += 'Linux-x86_64.sh' if islin else "Windows-x86_64.exe"
+        down  = tempfile.mktemp(suffix = b'sh' if islin else b'exe')
+        request.urlretrieve(site, down)
+        if islin:
+            subprocess.check_call(['bash', down, '-b'])
+        else:
+            subprocess.check_call([down, '-b'])
+
+    subprocess.check_call(['conda', 'create', '-n', envname, 'numpy'])
 
 @addconfigure
 def numpy(cnf:Context):

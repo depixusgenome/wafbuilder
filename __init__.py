@@ -12,7 +12,7 @@ from ._defaults     import wscripted, defaultwscript
 from ._requirements import REQ as requirements
 from ._utils        import addmissing, appname, copyfiles, runall, patch, getlocals
 from ._python       import checkpy, findpyext, condaenv, runtest
-from ._git          import version as _gitversion
+from .git           import version
 
 def top()-> str:
     u"returns top path"
@@ -23,13 +23,6 @@ def top()-> str:
 def output() -> str:
     u"returns build path"
     return top() + "/build"
-
-def version() -> str:
-    u"returns git tag"
-    try:
-        return _gitversion()
-    except:             # pylint: disable=bare-except
-        return "0.0.1"
 
 def register(name:str, fcn:Callable[[Context], None], glob:dict):
     u"Registers a *build* command for building a single module"
