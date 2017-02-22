@@ -250,4 +250,15 @@ def build_cpp(bld:Context, name:str, version:str, **kwargs):
             args.setdefault('use', []).append(name+'_lib')
         bld.program(**args)
 
+@conf
+def cpp_compiler_name(cnf:Context):
+    u"Returns the compiler version used"
+    curr = cnf.env['CC_VERSION']
+    if _ismsvc(cnf):
+        curr = cnf.env['MSVC_VERSION']
+    if isinstance(curr, tuple):
+        curr = '.'.join(str(i) for i in curr)
+
+    return cnf.env['COMPILER_CXX']+"-"+str(curr)
+
 addmissing()
