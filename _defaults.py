@@ -2,20 +2,20 @@
 # -*- coding: utf-8 -*-
 u"Default functions for waf"
 import os
-from typing     import Sequence, Dict # pylint: disable=unused-import
-from functools  import wraps
+from pathlib        import Path
+from typing         import Sequence, Dict # pylint: disable=unused-import
+from functools      import wraps
 from waflib.Context import WSCRIPT_FILE
 
-_DEFAULT_WAFS = {} # type: Dict[str, str]
+_DEFAULT_WAFS = {} # type: Dict[Path, str]
 
 def wscripted(path) -> Sequence[str]:
     u"return subdirs with wscript in them"
-    path = path.replace("\\", "/")
-    if not path.endswith("/"):
-        path += "/"
-    return [path+x for x in os.listdir(path)
-            if (os.path.exists(path+x+"/"+WSCRIPT_FILE)
-                or os.path.abspath(path+x)+"/"+WSCRIPT_FILE in _DEFAULT_WAFS)]
+    orig = path
+    path = Path.cwd() / path
+    return [orig+'/'+x for x in os.listdir(str(path))
+            if (path/x/WSCRIPT_FILE).exists()
+                or (path/x/WSCRIPT_FILE) in _DEFAULT_WAFS]
 
 def defaultwscript(path, code = 'make()'):
     u"""
@@ -28,7 +28,7 @@ def defaultwscript(path, code = 'make()'):
 
         @wraps(_Utils.readf)
         def _read(fname, *args, __old__ = _Utils.readf, **kwa):
-            code = _DEFAULT_WAFS.get(fname.replace("\\", "/"), None)
+            code = _DEFAULT_WAFS.get(Path(fname), None)
             if code is not None and not os.path.exists(fname):
                 return code
             return __old__(fname, *args, **kwa)
@@ -37,25 +37,23 @@ def defaultwscript(path, code = 'make()'):
         from waflib.Node import Node
         @wraps(Node.exists)
         def _exists(self, *_, __old__ = Node.exists):
-            if self.abspath().replace("\\", "/") in _DEFAULT_WAFS:
+            if Path(self.abspath()) in _DEFAULT_WAFS:
                 return True
             else:
                 return __old__(self)
         Node.exists = _exists
 
-    path = path.replace("\\", "/")
-    if not path.endswith("/"):
-        path += "/"
-
-    dirs = [os.path.abspath(path+x)+"/"+WSCRIPT_FILE for x in os.listdir(path)]
+    path = Path.cwd()/path
+    dirs = [path/x/WSCRIPT_FILE for x in os.listdir(str(path))]
     _DEFAULT_WAFS.update((i, code) for i in dirs)
 
 def reload(modules):
     u"reloads the data"
     for mod in modules:
-        fname = os.path.abspath((mod+"/" if len(mod) else ""))+"/"+WSCRIPT_FILE
-        if os.path.exists(fname):
-            with open(fname, 'r', encoding = 'utf-8') as stream:
+        fname = Path.cwd()/mod/WSCRIPT_FILE
+
+        if fname.exists():
+            with open(str(fname), 'r', encoding = 'utf-8') as stream:
                 src = u''.join(stream)
                 exec(compile(src, mod, 'exec')) # pylint: disable=exec-used
 
