@@ -9,10 +9,11 @@ import sys
 
 from typing             import Sequence, List
 from contextlib         import closing
+from pkg_resources      import get_distribution
+
 from waflib.Configure   import conf
 from waflib.Context     import Context # type: ignore
 from waflib.Tools       import python as pytools # for correcting a bug
-from pkg_resources import get_distribution
 from ._utils        import (YES, Make, addconfigure, runall, copyargs,
                             addmissing, copyfiles, copytargets)
 from ._cpp          import Flags as CppFlags
@@ -239,18 +240,15 @@ def checkpy(bld:Context, name:str, items:Sequence):
         if len(msg):
             bld.fatal('In file %s:\n\t- ' % tsk.inputs[0].abspath()+msg)
 
-    if sys.version.startswith("3.5"):
-        mypy   = '${MYPY} ${SRC} --silent-imports --fast-parser'
-    else:
-        mypy   = ('${MYPY} ${SRC}  --ignore-missing-imports '
-                  +'--follow-imports=skip --fast-parser')
+    mypy   = ('${MYPY} ${SRC}  --ignore-missing-imports '
+              +'--follow-imports=skip --fast-parser')
 
     pylint = ('${PYLINT} ${SRC} '
               + '--init-hook="sys.path.append(\'./\')" '
               + '--msg-template="{path}:{line}:{column}:{C}: [{symbol}] {msg}" '
               + '--disable=locally-disabled '
               + '--reports=no')
-    if get_distribution("astroid").version == '1.4.8':
+    if get_distribution("astroid").version == '1.4.8': # pylint: disable=no-member
         pylint += ' --disable=wrong-import-order,invalid-sequence-index'
     rules  = [dict(color       = 'CYAN',
                    rule        = _checkencoding,
