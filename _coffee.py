@@ -29,3 +29,6 @@ def build_coffee(bld:Context, name:str, _1, **_2):
     if len(coffees):
         bld      (source = coffees)
         copyfiles(bld, name, coffees)
+
+        tsx = bld.path.ant_glob('**/*.tsx')
+        copyfiles(bld, name, tsx)
