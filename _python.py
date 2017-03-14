@@ -6,18 +6,24 @@ import urllib.request as request
 import tempfile
 import re
 import sys
+from   distutils.version  import LooseVersion
 
 from typing             import Sequence, List
 from contextlib         import closing
 from pkg_resources      import get_distribution
 
+import conda.cli.python_api as api
+import conda.exceptions     as api_exc
+
 from waflib.Configure   import conf
 from waflib.Context     import Context # type: ignore
 from waflib.Tools       import python as pytools # for correcting a bug
-from ._utils        import (YES, Make, addconfigure, runall, copyargs,
-                            addmissing, copyfiles, copytargets)
-from ._cpp          import Flags as CppFlags
-from ._requirements import REQ as requirements
+from ._utils            import (YES, Make, addconfigure, runall, copyargs,
+                                addmissing, copyfiles, copytargets)
+from ._cpp              import Flags as CppFlags
+from ._requirements     import REQ as requirements
+
+import json
 
 pytools.PYTHON_MODULE_TEMPLATE = '''
 import os, pkg_resources
@@ -49,7 +55,7 @@ def _store(cnf:Context, flg:str):
     for item in 'PYEXT', 'PYEMBED':
         cnf.parse_flags(flg, uselib_store=item)
 
-def setup_conda(envname):
+def condasetup(envname):
     u"Installs conda"
     try:
         subprocess.check_output(['conda', '--version'])
@@ -64,7 +70,29 @@ def setup_conda(envname):
         else:
             subprocess.check_call([down, '-b'])
 
-    subprocess.check_call(['conda', 'create', '-n', envname, 'numpy'])
+    try:
+        api.run_command(api.Commands.LIST, "-n "+envname)
+    except api_exc.CondaEnvironmentNotFoundError:
+        api.run_command(api.Commands.CREATE, '-n '+envname  + " numpy")
+
+    for name, version in requirements.all('python').items():
+        if name == 'python':
+            continue
+        jres = api.run_command(api.Commands.LIST, '-n '+envname+ ' --json '+name)
+        res  = json.loads(jres[0])
+        print(name, version)
+        if len(res) == 0:
+            cmd = '-n '+envname+ ' ' + name
+            for channel in ('', ' -c conda-forge'):
+                try:
+                    api.run_command(api.Commands.INSTALL, cmd + channel)
+                except api_exc.PackageNotFoundError:
+                    continue
+                break
+            else:
+                subprocess.check_call(['pip', 'install', name])
+        elif LooseVersion(res[0]['version']) < version:
+            api.run_command(api.Commands.UPDATE, "-n "+envname + " "+ name)
 
 @addconfigure
 def numpy(cnf:Context):

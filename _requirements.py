@@ -155,6 +155,14 @@ class RequirementManager:
                     for name, origs in self._reqs[lang].items()
                     if any(isrt for _, isrt in origs.values())}
 
+    def all(self, lang = None):
+        u"returns build and runtime dependencies"
+        if lang is None:
+            return {lang: self.all(lang) for lang in self._reqs}
+        else:
+            return {name: max(vers for vers, _ in origs.values())
+                    for name, origs in self._reqs[lang].items()}
+
     def version(self, lang, name = None, allorigs = False):
         u"returns the version of a package"
         if name is None:

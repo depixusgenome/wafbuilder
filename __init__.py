@@ -12,7 +12,7 @@ from waflib.Build   import BuildContext
 from ._defaults     import wscripted, defaultwscript
 from ._requirements import REQ as requirements
 from ._utils        import addmissing, appname, appdir, copyfiles, runall, patch, getlocals
-from ._python       import checkpy, findpyext, condaenv, runtest
+from ._python       import checkpy, findpyext, condaenv, runtest, condasetup
 from .git           import version
 
 def top()-> str:
