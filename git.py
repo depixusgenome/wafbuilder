@@ -15,7 +15,7 @@ def version(path = None) -> str:
     u"returns last tag name"
     cmd = 'describe', '--always' # type: Any
     if path is not None:
-        commit = _cmd('log', '--format=%H', '-1')
+        commit = _cmd('log', '--format=%H', '-1', '--', str(path))
         cmd   += '--', commit.strip()
     else:
         cmd   +=  '--dirty=+',
