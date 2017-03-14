@@ -3,6 +3,7 @@
 u"Default functions for waf"
 import os
 from typing     import Sequence, Callable, Optional, Dict # pylint: disable=unused-import
+from pathlib    import Path
 from functools  import wraps
 
 from waflib.Context import Context
@@ -10,7 +11,7 @@ from waflib.Build   import BuildContext
 
 from ._defaults     import wscripted, defaultwscript
 from ._requirements import REQ as requirements
-from ._utils        import addmissing, appname, copyfiles, runall, patch, getlocals
+from ._utils        import addmissing, appname, appdir, copyfiles, runall, patch, getlocals
 from ._python       import checkpy, findpyext, condaenv, runtest
 from .git           import version
 
@@ -109,7 +110,7 @@ def make(glob = None, **kw):
             getattr(bld, 'build_'+_get(name))(app, vers, **kwa)
 
     # pylint: disable=unnecessary-lambda
-    toadd = dict(VERSION   = lambda: version(),
+    toadd = dict(VERSION   = lambda: version(appdir()),
                  APPNAME   = lambda: appname(),
                  top       = lambda: ".",
                  out       = lambda: output(),

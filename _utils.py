@@ -3,6 +3,7 @@
 u"Default utils for waf"
 import inspect
 import shutil
+from   pathlib      import Path
 from typing         import (Iterator, Callable, # pylint: disable=unused-import
                             Iterable, Union, Sequence, cast)
 from types          import ModuleType, FunctionType
@@ -24,7 +25,7 @@ def getlocals(glob = None, ind = 1) -> dict:
         return inspect.stack()[ind+1][0].f_locals
     return glob
 
-def appname(iframe: int  = None) -> str:
+def appdir(iframe: int  = None) -> str:
     u"returns directory"
     if iframe is None:
         mymod  = __file__.replace('\\', '/')
@@ -42,9 +43,11 @@ def appname(iframe: int  = None) -> str:
 
     else:
         fname = inspect.getouterframes(inspect.currentframe())[iframe].filename
-    fname = fname.replace('\\', '/')
-    fname = fname[:fname.rfind('/')]
-    return fname[fname.rfind('/')+1:]
+    return Path(fname).parent
+
+def appname(iframe: int  = None) -> str:
+    u"returns directory"
+    return appdir(iframe).stem
 
 class Make(object):
     u"base class for a given functionnality"

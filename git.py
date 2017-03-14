@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u"git extraction functions"
+from   typing import Any # pylint: disable=unused-import
 import os
 import subprocess
 
@@ -10,9 +11,15 @@ def _cmd(*args) -> str:
     else:
         return ''
 
-def version() -> str:
+def version(path = None) -> str:
     u"returns last tag name"
-    return _cmd('describe', '--dirty=+', '--always')
+    cmd = 'describe', '--always' # type: Any
+    if path is not None:
+        commit = _cmd('log', '--format=%H', '-1')
+        cmd   += '--', commit.strip()
+    else:
+        cmd   +=  '--dirty=+',
+    return _cmd(*cmd)
 
 def lasthash() -> str:
     u"returns last commit hashtag"

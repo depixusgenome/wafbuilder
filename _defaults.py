@@ -58,6 +58,7 @@ def reload(modules):
                 exec(compile(src, mod, 'exec')) # pylint: disable=exec-used
 
         elif fname in _DEFAULT_WAFS:
+            src = _DEFAULT_WAFS[fname]
             exec(compile(src, mod, 'exec')) # pylint: disable=exec-used
 
         else:
