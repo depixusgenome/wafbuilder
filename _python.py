@@ -14,9 +14,6 @@ from typing             import Sequence, List
 from contextlib         import closing
 from pkg_resources      import get_distribution
 
-import conda.cli.python_api as api
-import conda.exceptions     as api_exc
-
 from waflib             import Logs
 from waflib.Configure   import conf
 from waflib.Context     import Context # type: ignore
@@ -347,8 +344,9 @@ def options(opt:Context):
 
 def condasetup(cnf:Context):
     u"Installs conda"
-    envname = cnf.options.condaenv
-    rtime   = cnf.options.runtimeonly
+    condaenv = cnf.options.condaenv
+    rtime    = cnf.options.runtimeonly
+
     try:
         subprocess.check_output(['conda', '--version'])
     except: # pylint: disable=bare-except
@@ -362,6 +360,8 @@ def condasetup(cnf:Context):
         else:
             subprocess.check_call([down, '-b'])
 
+    import conda.cli.python_api as api
+    import conda.exceptions     as api_exc
     try:
         api.run_command(api.Commands.LIST, "-n "+envname)
     except api_exc.CondaEnvironmentNotFoundError:

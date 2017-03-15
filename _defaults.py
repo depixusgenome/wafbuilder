@@ -14,8 +14,8 @@ def wscripted(path) -> Sequence[str]:
     orig = path
     path = Path.cwd() / path
     return [orig+'/'+x for x in os.listdir(str(path))
-            if (path/x/WSCRIPT_FILE).exists()
-                or (path/x/WSCRIPT_FILE) in _DEFAULT_WAFS]
+            if ((path/x/WSCRIPT_FILE).exists()
+                or (path/x).resolve()/WSCRIPT_FILE in _DEFAULT_WAFS)]
 
 def defaultwscript(path, code = 'make()'):
     u"""
@@ -44,13 +44,13 @@ def defaultwscript(path, code = 'make()'):
         Node.exists = _exists
 
     path = Path.cwd()/path
-    dirs = [path/x/WSCRIPT_FILE for x in os.listdir(str(path))]
+    dirs = [(path/x).resolve()/WSCRIPT_FILE for x in os.listdir(str(path))]
     _DEFAULT_WAFS.update((i, code) for i in dirs)
 
 def reload(modules):
     u"reloads the data"
     for mod in modules:
-        fname = Path.cwd()/mod/WSCRIPT_FILE
+        fname = (Path.cwd()/mod).resolve()/WSCRIPT_FILE
 
         if fname.exists():
             with open(str(fname), 'r', encoding = 'utf-8') as stream:
