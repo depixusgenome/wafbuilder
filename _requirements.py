@@ -7,7 +7,7 @@ from distutils.version  import LooseVersion
 from copy               import deepcopy
 from typing             import (Dict, Set, Callable, # pylint: disable=unused-import
                                 Optional, Tuple, Iterable)
-from waflib.Context     import Context, WSCRIPT_FILE
+from waflib.Context     import Context
 from ._defaults         import reload as _reload
 from ._utils            import appname
 
@@ -155,10 +155,12 @@ class RequirementManager:
                     for name, origs in self._reqs[lang].items()
                     if any(isrt for _, isrt in origs.values())}
 
-    def all(self, lang = None):
+    def __call__(self, lang = None, runtimeonly = False):
         u"returns build and runtime dependencies"
-        if lang is None:
-            return {lang: self.all(lang) for lang in self._reqs}
+        if runtimeonly:
+            return self.runtime(lang)
+        elif lang is None:
+            return {lang: self(lang) for lang in self._reqs}
         else:
             return {name: max(vers for vers, _ in origs.values())
                     for name, origs in self._reqs[lang].items()}

@@ -6,6 +6,8 @@ import urllib.request as request
 import tempfile
 import re
 import sys
+import json
+
 from   distutils.version  import LooseVersion
 
 from typing             import Sequence, List
@@ -15,6 +17,7 @@ from pkg_resources      import get_distribution
 import conda.cli.python_api as api
 import conda.exceptions     as api_exc
 
+from waflib             import Logs
 from waflib.Configure   import conf
 from waflib.Context     import Context # type: ignore
 from waflib.Tools       import python as pytools # for correcting a bug
@@ -22,8 +25,6 @@ from ._utils            import (YES, Make, addconfigure, runall, copyargs,
                                 addmissing, copyfiles, copytargets)
 from ._cpp              import Flags as CppFlags
 from ._requirements     import REQ as requirements
-
-import json
 
 pytools.PYTHON_MODULE_TEMPLATE = '''
 import os, pkg_resources
@@ -54,45 +55,6 @@ IS_MAKE = YES
 def _store(cnf:Context, flg:str):
     for item in 'PYEXT', 'PYEMBED':
         cnf.parse_flags(flg, uselib_store=item)
-
-def condasetup(envname):
-    u"Installs conda"
-    try:
-        subprocess.check_output(['conda', '--version'])
-    except: # pylint: disable=bare-except
-        islin = sys.platform == 'linux'
-        site  = "https://repo.continuum.io/miniconda/Miniconda3-latest-"
-        site += 'Linux-x86_64.sh' if islin else "Windows-x86_64.exe"
-        down  = tempfile.mktemp(suffix = b'sh' if islin else b'exe')
-        request.urlretrieve(site, down)
-        if islin:
-            subprocess.check_call(['bash', down, '-b'])
-        else:
-            subprocess.check_call([down, '-b'])
-
-    try:
-        api.run_command(api.Commands.LIST, "-n "+envname)
-    except api_exc.CondaEnvironmentNotFoundError:
-        api.run_command(api.Commands.CREATE, '-n '+envname  + " numpy")
-
-    for name, version in requirements.all('python').items():
-        if name == 'python':
-            continue
-        jres = api.run_command(api.Commands.LIST, '-n '+envname+ ' --json '+name)
-        res  = json.loads(jres[0])
-        print(name, version)
-        if len(res) == 0:
-            cmd = '-n '+envname+ ' ' + name
-            for channel in ('', ' -c conda-forge'):
-                try:
-                    api.run_command(api.Commands.INSTALL, cmd + channel)
-                except api_exc.PackageNotFoundError:
-                    continue
-                break
-            else:
-                subprocess.check_call(['pip', 'install', name])
-        elif LooseVersion(res[0]['version']) < version:
-            api.run_command(api.Commands.UPDATE, "-n "+envname + " "+ name)
 
 @addconfigure
 def numpy(cnf:Context):
@@ -366,6 +328,64 @@ def build_python(bld:Context, name:str, version:str, **kwargs):
     buildpyext(bld, name, version, pysrc, csrc, **kwargs)
     buildpymod(bld, name, pysrc)
     copyfiles(bld,name,bld.path.ant_glob('**/*.ipynb'))
+
+@runall
+def options(opt:Context):
+    u"Adding conda options"
+    opt.add_option_group('condasetup options')\
+        .add_option('-e', '--envname',
+                    dest    = 'condaenv',
+                    action  = 'store',
+                    default = 'root',
+                    help    = u"conda environment name")
+    opt.get_option_group('condasetup options')\
+        .add_option('-r', '--runtime-only',
+                    dest    = 'runtimeonly',
+                    action  = 'store_true',
+                    default = False,
+                    help    = u"install only runtime modules")
+
+def condasetup(cnf:Context):
+    u"Installs conda"
+    envname = cnf.options.condaenv
+    rtime   = cnf.options.runtimeonly
+    try:
+        subprocess.check_output(['conda', '--version'])
+    except: # pylint: disable=bare-except
+        islin = sys.platform == 'linux'
+        site  = "https://repo.continuum.io/miniconda/Miniconda3-latest-"
+        site += 'Linux-x86_64.sh' if islin else "Windows-x86_64.exe"
+        down  = tempfile.mktemp(suffix = 'sh' if islin else 'exe')
+        request.urlretrieve(site, down)
+        if islin:
+            subprocess.check_call(['bash', down, '-b'])
+        else:
+            subprocess.check_call([down, '-b'])
+
+    try:
+        api.run_command(api.Commands.LIST, "-n "+envname)
+    except api_exc.CondaEnvironmentNotFoundError:
+        api.run_command(api.Commands.CREATE, '-n '+envname  + " numpy")
+
+    for name, version in requirements('python', runtimeonly = rtime).items():
+        if name == 'python':
+            continue
+        jres = api.run_command(api.Commands.LIST, '-n '+envname+ ' --json '+name)
+        res  = json.loads(jres[0])
+        Logs.info("checking: %s=%s", name, version)
+
+        if len(res) == 0:
+            cmd = '-n '+envname+ ' ' + name
+            for channel in ('', ' -c conda-forge'):
+                try:
+                    api.run_command(api.Commands.INSTALL, cmd + channel)
+                except api_exc.PackageNotFoundError:
+                    continue
+                break
+            else:
+                subprocess.check_call(['pip', 'install', name])
+        elif LooseVersion(res[0]['version']) < version:
+            api.run_command(api.Commands.UPDATE, "-n "+envname + " "+ name)
 
 def condaenv(name, reqs = None, stream = None):
     u"creates a conda yaml file"
