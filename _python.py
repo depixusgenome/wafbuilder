@@ -344,8 +344,8 @@ def options(opt:Context):
 
 def condasetup(cnf:Context):
     u"Installs conda"
-    condaenv = cnf.options.condaenv
-    rtime    = cnf.options.runtimeonly
+    envname = cnf.options.condaenv
+    rtime   = cnf.options.runtimeonly
 
     try:
         subprocess.check_output(['conda', '--version'])
@@ -362,30 +362,54 @@ def condasetup(cnf:Context):
 
     import conda.cli.python_api as api
     import conda.exceptions     as api_exc
+    from conda.base.context import context
+    context.always_yes = True
     try:
         api.run_command(api.Commands.LIST, "-n "+envname)
     except api_exc.CondaEnvironmentNotFoundError:
         api.run_command(api.Commands.CREATE, '-n '+envname  + " numpy")
 
+    jres = api.run_command(api.Commands.LIST, '-n '+envname+ ' --json ')
+    res  = {i['name']: (i['version'], i['channel']) for i in json.loads(jres[0])}
     for name, version in requirements('python', runtimeonly = rtime).items():
         if name == 'python':
             continue
-        jres = api.run_command(api.Commands.LIST, '-n '+envname+ ' --json '+name)
-        res  = json.loads(jres[0])
-        Logs.info("checking: %s=%s", name, version)
 
-        if len(res) == 0:
-            cmd = '-n '+envname+ ' ' + name
+        Logs.info("checking: %s=%s", name, version)
+        if name in res and LooseVersion(res[name][0]) >= version:
+            continue
+
+        if name in res:
+            cmd = '-n '+envname+ ' ' + name +'='+str(version)
+            if res[name][1] != 'defaults':
+                cmd += ' -c '+res[name][1]
+            try:
+                api.run_command(api.Commands.INSTALL, cmd)
+            except: # pylint: disable=bare-except
+                pass
+            else:
+                continue
+
+        cur = None
+        try:
+            cur = subprocess.check_output(['pip', 'show', name]).split(b'\n')[1]
+            cur = cur.split(b':')[1].decode('utf-8').strip()
+            if LooseVersion(cur) < version:
+                cur = None
+        except subprocess.CalledProcessError:
+            cmd = '-n '+envname+ ' ' + name +'='+str(version)
             for channel in ('', ' -c conda-forge'):
                 try:
                     api.run_command(api.Commands.INSTALL, cmd + channel)
-                except api_exc.PackageNotFoundError:
+                except: # pylint: disable=bare-except
                     continue
                 break
             else:
                 subprocess.check_call(['pip', 'install', name])
-        elif LooseVersion(res[0]['version']) < version:
-            api.run_command(api.Commands.UPDATE, "-n "+envname + " "+ name)
+            continue
+
+        if cur is None:
+            subprocess.check_call(['pip', 'install', name])
 
 def condaenv(name, reqs = None, stream = None):
     u"creates a conda yaml file"
