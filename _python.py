@@ -425,11 +425,14 @@ class CondaSetup:
     def __condainstall(cnf, name, version):
         "installs a module with conda"
         import conda.cli.python_api as api
-        cmd = '-n '+cnf.options.condaenv+ ' ' + name +'='+str(version)
+        cmd = '-n '+cnf.options.condaenv+ ' ' + name
+        if version is not None:
+            cmd += '='+str(version)
         for channel in ('', ' -c conda-forge'):
             try:
                 api.run_command(api.Commands.INSTALL, cmd + channel)
             except: # pylint: disable=bare-except
+                Logs.info("failed on channel '%s'", channel)
                 continue
             return True
         return False
@@ -440,13 +443,19 @@ class CondaSetup:
         jres = api.run_command(api.Commands.LIST, '-n '+cnf.options.condaenv+ ' --json ')
         return {i['name']: (i['version'], i['channel']) for i in json.loads(jres[0])}
 
-    @staticmethod
-    def __pip(cnf):
+    @classmethod
+    def __pip(cls, cnf):
         import conda.cli.python_api as api
         envs = json.loads(api.run_command(api.Commands.INFO, '--json')[0])['envs']
         for env in envs:
             if env.endswith(cnf.options.condaenv):
-                return env+"/bin/pip"
+                if sys.platform.startswith('win'):
+                    path = Path(env)/"Scripts"/"pip.exe"
+                else:
+                    path = Path(env)/"bin"/"pip"
+                if not path.exists():
+                    cls.__condainstall(cnf, 'pip', None)
+                return str(path.resolve())
         return 'pip'
 
     @classmethod
@@ -458,8 +467,12 @@ class CondaSetup:
         context.always_yes = True
         cls.__download()
         cls.__createenv(cnf)
-        res = cls.__currentlist(cnf)
-        for name, version in requirements('python', runtimeonly = rtime).items():
+        res  = cls.__currentlist(cnf)
+        itms = requirements('python', runtimeonly = rtime)
+        itms.update((i[len('python_'):], j)
+                    for i, j in requirements('cpp', runtimeonly = rtime).items()
+                    if i.startswith('python_'))
+        for name, version in itms.items():
             if name == 'python':
                 continue
 
