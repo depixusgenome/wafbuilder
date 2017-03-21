@@ -155,15 +155,18 @@ class RequirementManager:
                     for name, origs in self._reqs[lang].items()
                     if any(isrt for _, isrt in origs.values())}
 
-    def __call__(self, lang = None, runtimeonly = False):
+    def __call__(self, lang = None, name = None, runtimeonly = False):
         u"returns build and runtime dependencies"
-        if runtimeonly:
+        if runtimeonly and name is None:
             return self.runtime(lang)
         elif lang is None:
+            assert name is None
             return {lang: self(lang) for lang in self._reqs}
-        else:
+        elif name is None:
             return {name: max(vers for vers, _ in origs.values())
                     for name, origs in self._reqs[lang].items()}
+        else:
+            return max(vers for vers, _ in self._reqs[lang][name].values())
 
     def version(self, lang, name = None, allorigs = False):
         u"returns the version of a package"

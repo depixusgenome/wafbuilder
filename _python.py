@@ -356,21 +356,32 @@ def build_python(bld:Context, name:str, version:str, **kwargs):
 @runall
 def options(opt:Context):
     "Adding conda options"
-    opt.add_option_group('condasetup options')\
-        .add_option('-e', '--envname',
-                    dest    = 'condaenv',
-                    action  = 'store',
-                    default = 'root',
-                    help    = u"conda environment name")
-    opt.get_option_group('condasetup options')\
-        .add_option('-r', '--runtime-only',
-                    dest    = 'runtimeonly',
-                    action  = 'store_true',
-                    default = False,
-                    help    = u"install only runtime modules")
+    CondaSetup.options(opt)
 
 class CondaSetup:
     "installs / updates a conda environment"
+    @staticmethod
+    def options(opt:Context):
+        "defines options for conda setup"
+        grp = opt.add_option_group('condasetup options')
+        grp.add_option('-e', '--envname',
+                       dest    = 'condaenv',
+                       action  = 'store',
+                       default = 'root',
+                       help    = u"conda environment name")
+
+        grp.add_option('-m', '--min-version',
+                       dest    = 'minversion',
+                       action  = 'store_true',
+                       default = False,
+                       help    = u"install requirement minimum versions by default")
+
+        grp.add_option('-r', '--runtime-only',
+                       dest    = 'runtimeonly',
+                       action  = 'store_true',
+                       default = False,
+                       help    = u"install only runtime modules")
+
     @staticmethod
     def __download():
         try:
@@ -385,6 +396,7 @@ class CondaSetup:
                 subprocess.check_call(['bash', down, '-b'])
             else:
                 subprocess.check_call([down, '-b'])
+
     @staticmethod
     def __createenv(cnf):
         "create conda environment"
@@ -394,7 +406,17 @@ class CondaSetup:
         try:
             api.run_command(api.Commands.LIST, "-n "+envname)
         except api_exc.CondaEnvironmentNotFoundError:
-            api.run_command(api.Commands.CREATE, '-n '+envname  + " numpy")
+            if cnf.options.minversion:
+                version = requirements('python', 'numpy')
+                cmd     =  '-n '+envname  + " numpy="+str(version)
+                try:
+                    api.run_command(api.Commands.CREATE, cmd)
+                except: # pylint: disable=bare-except
+                    pass
+                else:
+                    return
+            cmd =  '-n '+envname  + " numpy"
+            api.run_command(api.Commands.CREATE, cmd)
 
     @classmethod
     def __pipversion(cls, cnf, name, version):
@@ -405,29 +427,42 @@ class CondaSetup:
             return False
         return True
 
-    @staticmethod
-    def __condaupdate(cnf, res, name, version):
+    @classmethod
+    def __condaupdate(cls, cnf, res, name, version):
         "updates a module with conda"
         if name not in res:
             return False
 
-        import conda.cli.python_api as api
-        cmd = '-n '+cnf.options.condaenv+ ' ' + name +'='+str(version)
+        if not cnf.options.minversion:
+            version = None
+
+        cmd = '-n '+cnf.options.condaenv+ ' ' + name
+        if version is not None:
+            cmd += '=' + str(version)
+
         if res[name][1] != 'defaults':
             cmd += ' -c '+res[name][1]
+
+        import conda.cli.python_api as api
         try:
             api.run_command(api.Commands.INSTALL, cmd)
         except: # pylint: disable=bare-except
-            return False
+            if version is None:
+                return False
+            return cls.__condaupdate(cnf, res, name, None)
         return True
 
-    @staticmethod
-    def __condainstall(cnf, name, version):
+    @classmethod
+    def __condainstall(cls, cnf, name, version):
         "installs a module with conda"
-        import conda.cli.python_api as api
+        if not cnf.options.minversion:
+            version = None
+
         cmd = '-n '+cnf.options.condaenv+ ' ' + name
         if version is not None:
             cmd += '='+str(version)
+
+        import conda.cli.python_api as api
         for channel in ('', ' -c conda-forge'):
             try:
                 api.run_command(api.Commands.INSTALL, cmd + channel)
@@ -435,6 +470,8 @@ class CondaSetup:
                 Logs.info("failed on channel '%s'", channel)
                 continue
             return True
+        if version is not None:
+            return cls.__condainstall(cnf, name, None)
         return False
 
     @staticmethod
@@ -477,18 +514,23 @@ class CondaSetup:
                 continue
 
             Logs.info("checking: %s=%s", name, version)
-            if name in res and LooseVersion(res[name][0]) >= version:
+            if (name in res
+                    and LooseVersion(res[name][0]) >= version
+                    and cnf.options.minversion):
                 continue
 
             if cls.__condaupdate(cnf, res, name, version):
                 continue
 
             try:
-                if cls.__pipversion(cnf, name, version):
+                if (cls.__pipversion(cnf, name, version)
+                        and cnf.options.minversion):
                     continue
             except subprocess.CalledProcessError:
-                if cls.__condainstall(cnf, name, version):
-                    continue
+                pass
+
+            if cls.__condainstall(cnf, name, version):
+                continue
 
             subprocess.check_call([cls.__pip(cnf), 'install', name])
 
