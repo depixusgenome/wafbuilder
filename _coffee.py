@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u"All *basic* coffeescript related details"
+import sys
+
 from waflib             import TaskGen
 from waflib.Configure   import conf
 from waflib.Context     import Context
@@ -17,7 +19,11 @@ TaskGen.declare_chain(
     reentrant    = False,
     install_path = None)
 
-requirements.addcheck(requirements.programversion, 'coffee', 'coffee')
+@requirements.addcheck
+def check_coffee(cnf, name, version):
+    "check for coffeescript"
+    mand = not sys.platform.startswith("win")
+    requirements.programversion(cnf, name, version, mandatory = mand)
 
 @conf
 def build_coffee(bld:Context, name:str, _1, **_2):
@@ -27,7 +33,8 @@ def build_coffee(bld:Context, name:str, _1, **_2):
 
     coffees = bld.path.ant_glob('**/*.coffee')
     if len(coffees):
-        bld      (source = coffees)
+        if 'COFFEE' in bld.env:
+            bld(source = coffees)
         copyfiles(bld, name, coffees)
 
         tsx = bld.path.ant_glob('**/*.tsx')

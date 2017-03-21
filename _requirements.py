@@ -193,14 +193,25 @@ class RequirementManager:
                     or any(re.match(args[1], name) for name in mods))
 
     @staticmethod
-    def programversion(cnf:Context, name:str, minver:LooseVersion, reg = None):
+    def programversion(cnf   :Context,
+                       name  :str,
+                       minver:LooseVersion,
+                       reg       = None,
+                       mandatory = True):
         u"check version of a program"
         if reg is None:
             areg = name
         else:
             areg = reg
 
-        cnf.find_program(name, var = name.upper())
+        try:
+            cnf.find_program(name, var = name.upper())
+        except: # pylint: disable=bare-except
+            if mandatory:
+                raise
+            else:
+                return False
+
         cmd    = [getattr(cnf.env, name.upper())[0], "--version"]
 
         found  = cnf.cmd_and_log(cmd).split('\n')
@@ -208,11 +219,14 @@ class RequirementManager:
         found  = next((line for line in found if areg in line), found[-1]).split()[-1]
         found  = found[found.rfind(' ')+1:].replace(',', '').strip()
         if LooseVersion(found) < minver:
+            if not mandatory:
+                return False
             if reg is None:
                 cnf.fatal('The %s version is too old, expecting %r'%(name, minver))
             else:
                 cnf.fatal('The %s (%s) version is too old, expecting %r'
                           %(name, str(reg), minver))
+        return True
 
     def tostream(self, stream = None):
         u"prints requirements"
