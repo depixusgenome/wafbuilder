@@ -1,27 +1,28 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-u"All *basic* python related details"
+"All *basic* python related details"
 import subprocess
 import urllib.request as request
 import tempfile
 import re
 import sys
 import json
+from   pathlib              import Path
 
-from   distutils.version  import LooseVersion
+from   distutils.version    import LooseVersion
 
-from typing             import Sequence, List
-from contextlib         import closing
-from pkg_resources      import get_distribution
+from typing                 import Sequence, List
+from contextlib             import closing
+from pkg_resources          import get_distribution
 
-from waflib             import Logs
-from waflib.Configure   import conf
-from waflib.Context     import Context # type: ignore
-from waflib.Tools       import python as pytools # for correcting a bug
-from ._utils            import (YES, Make, addconfigure, runall, copyargs,
-                                addmissing, copyfiles, copytargets)
-from ._cpp              import Flags as CppFlags
-from ._requirements     import REQ as requirements
+from waflib                 import Logs
+from waflib.Configure       import conf
+from waflib.Context         import Context # type: ignore
+from waflib.Tools           import python as pytools # for correcting a bug
+from ._utils                import (YES, Make, addconfigure, runall, copyargs,
+                                    addmissing, copyfiles, copytargets)
+from ._cpp                  import Flags as CppFlags
+from ._requirements         import REQ as requirements
 
 pytools.PYTHON_MODULE_TEMPLATE = '''
 import os, pkg_resources
@@ -55,7 +56,7 @@ def _store(cnf:Context, flg:str):
 
 @addconfigure
 def numpy(cnf:Context):
-    u"tests numpy and obtains its headers"
+    "tests numpy and obtains its headers"
     # modules are checked by parsing REQUIRE
     if ('python', 'numpy') not in requirements:
         return
@@ -67,7 +68,7 @@ def numpy(cnf:Context):
     _store(cnf, flg)
 
 class PyBind11(Make):
-    u"tests pybind11 and obtains its headers"
+    "tests pybind11 and obtains its headers"
     _NAME = 'python', 'pybind11'
     @classmethod
     def options(cls, opt):
@@ -117,12 +118,12 @@ class PyBind11(Make):
                       mandatory = True)
 
 def toload(_:Context):
-    u"returns python features to be loaded"
+    "returns python features to be loaded"
     return 'python' if 'python' in requirements else ''
 
 @requirements.addcheck
 def check_python(cnf, _, version):
-    u"checks the python version when necessary"
+    "checks the python version when necessary"
     if 'PYTHON_VERSION' in cnf.env:
         return
     cnf.check_python_version(tuple(int(val) for val in str(version).split('.')))
@@ -130,7 +131,7 @@ def check_python(cnf, _, version):
 
 @requirements.addcheck
 def check_python_default(cnf, name, version):
-    u"Adds a default requirement checker"
+    "Adds a default requirement checker"
     cond = 'ver >= num('+str(version).replace('.',',')+')'
     cnf.check_python_module(name.replace("python-", ""), condition = cond)
 
@@ -138,23 +139,23 @@ requirements.addcheck(requirements.programversion, lang = 'python', name = 'pyli
 
 @requirements.addcheck
 def check_python_astroid(cnf, name, version):
-    u"checks pylint's astroid version"
+    "checks pylint's astroid version"
     requirements.programversion(cnf, 'pylint', version, reg = name)
 
 @requirements.addcheck
 def check_python_mypy(cnf, name, version):
-    u"checks python's mypy"
+    "checks python's mypy"
     requirements.programversion(cnf, name, version)
     cmd = [getattr(cnf.env, name.upper())[0], "--fast-parser", "-c", '"print(1)"']
     cnf.cmd_and_log(cmd)
 
 @runall
 def configure(_:Context):
-    u"get python headers and modules"
+    "get python headers and modules"
     pass
 
 def pymoduledependencies(pysrc, name = None):
-    u"detects dependencies"
+    "detects dependencies"
     patterns = tuple(re.compile(r'^\s*'+pat) for pat in
                      (r'from\s+([\w.]+)\s+import\s+', r'import\s*(\w+)'))
     mods     = set()
@@ -178,7 +179,7 @@ def pymoduledependencies(pysrc, name = None):
     return mods
 
 def findpyext(bld:Context, items:Sequence):
-    u"returns a list of pyextension in that module"
+    "returns a list of pyextension in that module"
     names = list(items)
     bld.env.pyextmodules = set()
     for name in names:
@@ -187,7 +188,7 @@ def findpyext(bld:Context, items:Sequence):
             bld.env.pyextmodules.add(name[name.rfind('/')+1:])
 
 def haspyext(csrc):
-    u"detects whether pybind11 is used"
+    "detects whether pybind11 is used"
     pattern = re.compile(r'\s*#\s*include\s*["<]pybind11')
     for item in csrc:
         with closing(open(item.abspath(), 'r')) as stream:
@@ -195,87 +196,113 @@ def haspyext(csrc):
                 return True
     return False
 
+class Linting:
+    "all rules for checking python"
+    @staticmethod
+    def __pylintrule():
+        pylint = ('${PYLINT} ${SRC} '
+                  + '--init-hook="sys.path.append(\'./\')" '
+                  + '--msg-template="{path}:{line}:{column}:{C}: [{symbol}] {msg}" '
+                  + '--disable=locally-disabled '
+                  + '--reports=no')
+        if get_distribution("astroid").version == '1.4.8': # pylint: disable=no-member
+            pylint += ' --disable=wrong-import-order,invalid-sequence-index'
+
+        for name in ('', 'linting', '..', '../linting'):
+            path = Path(name)/'pylintrc'
+            if path.exists():
+                pylint += ' --rcfile="'+str(path.resolve())+'"'
+                break
+
+        return dict(color       = 'YELLOW',
+                    rule        = pylint,
+                    cls_keyword = lambda _: 'PyLint')
+
+    @staticmethod
+    def __mypyrule():
+        mypy   = ('${MYPY} ${SRC}  --ignore-missing-imports '
+                  +'--follow-imports=skip --fast-parser')
+        for name in ('', 'linting', '..', '../linting'):
+            path = Path(name)/'mypy.ini'
+            if path.exists():
+                mypy += ' --config-file="'+str(path.resolve())+'"'
+                break
+        return dict(color       = 'BLUE',
+                    rule        = mypy,
+                    cls_keyword = lambda _: 'MyPy')
+
+    @staticmethod
+    def __encodingrule(bld):
+        def _checkencoding(tsk):
+            headers = '#!/usr/bin/env python3\n', '# -*- coding: utf-8 -*-\n'
+
+            with open(tsk.inputs[0].abspath(), 'r') as stream:
+                errs    = [True]*2
+                try:
+                    for i, head in enumerate(headers):
+                        errs[i] = next(stream) != head
+                except IOError as ex:
+                    bld.fatal("Could not open file", ex)
+                except StopIteration:
+                    pass
+
+            tpl = 'Missing or incorrect header line %d: '
+            msg = '\t- '.join((tpl % i + headers[i])  for i in range(len(errs)) if errs[i])
+            if len(msg):
+                bld.fatal('In file %s:\n\t- ' % tsk.inputs[0].abspath()+msg)
+
+        return dict(color       = 'CYAN',
+                    rule        = _checkencoding,
+                    cls_keyword = lambda _: 'python headers')
+
+    @classmethod
+    def run(cls, bld:Context, name:str, items:Sequence):
+        "builds tasks for checking code"
+        if len(items) == 0:
+            return
+
+        pyext = set(bld.env.pyextmodules)
+        if any(i.get_name() == name+':pyext' for i in bld.get_all_task_gen()):
+            pyext.add(name)
+
+        deps = list(pymoduledependencies(items, name) & pyext)
+        def _scan(_):
+            nodes = [bld.get_tgen_by_name(dep+':pyext').tasks[-1].outputs[0] for dep in deps]
+            return (nodes, [])
+
+        rules = [cls.__encodingrule(bld)] # type: List
+        if ('python', 'pylint') in requirements:
+            rules.append(cls.__pylintrule())
+            rules[-1]['scan'] = _scan
+
+        if ('python', 'mypy') in requirements:
+            rules.append(cls.__mypyrule())
+            rules[-1]['scan'] = _scan
+
+        def _build(item, kwargs):
+            bld(source = [item],
+                name   = str(item)+':'+kwargs['cls_keyword'](None).lower(),
+                **kwargs)
+
+        if name in deps:
+            for _, item in copytargets(bld, name, items):
+                for kwargs in rules:
+                    _build(item, kwargs)
+        else:
+            for item in items:
+                for kwargs in rules:
+                    _build(item, kwargs)
+
 def checkpy(bld:Context, name:str, items:Sequence):
-    u"builds tasks for checking code"
-    if len(items) == 0:
-        return
-
-    pyext = set(bld.env.pyextmodules)
-    if any(i.get_name() == name+':pyext' for i in bld.get_all_task_gen()):
-        pyext.add(name)
-
-    deps = list(pymoduledependencies(items, name) & pyext)
-    def _scan(_):
-        nodes = [bld.get_tgen_by_name(dep+':pyext').tasks[-1].outputs[0] for dep in deps]
-        return (nodes, [])
-
-    def _checkencoding(tsk):
-        headers = '#!/usr/bin/env python3\n', '# -*- coding: utf-8 -*-\n'
-
-        with open(tsk.inputs[0].abspath(), 'r') as stream:
-            errs    = [True]*2
-            try:
-                for i, head in enumerate(headers):
-                    errs[i] = next(stream) != head
-            except IOError as ex:
-                bld.fatal("Could not open file", ex)
-            except StopIteration:
-                pass
-
-        tpl = 'Missing or incorrect header line %d: '
-        msg = '\t- '.join((tpl % i + headers[i])  for i in range(len(errs)) if errs[i])
-        if len(msg):
-            bld.fatal('In file %s:\n\t- ' % tsk.inputs[0].abspath()+msg)
-
-    mypy   = ('${MYPY} ${SRC}  --ignore-missing-imports '
-              +'--follow-imports=skip --fast-parser')
-
-    pylint = ('${PYLINT} ${SRC} '
-              + '--init-hook="sys.path.append(\'./\')" '
-              + '--msg-template="{path}:{line}:{column}:{C}: [{symbol}] {msg}" '
-              + '--disable=locally-disabled '
-              + '--reports=no')
-    if get_distribution("astroid").version == '1.4.8': # pylint: disable=no-member
-        pylint += ' --disable=wrong-import-order,invalid-sequence-index'
-    rules  = [dict(color       = 'CYAN',
-                   rule        = _checkencoding,
-                   cls_keyword = lambda _: 'python headers'),
-              dict(color       = 'BLUE',
-                   rule        = mypy,
-                   scan        = _scan,
-                   cls_keyword = lambda _: 'MyPy'),
-              dict(color       = 'YELLOW',
-                   rule        = pylint,
-                   scan        = _scan,
-                   cls_keyword = lambda _: 'PyLint'),
-             ] # type: List
-
-    if ('python', 'pylint') not in requirements:
-        rules.pop()
-
-    if ('python', 'mypy') not in requirements:
-        rules.pop(1)
-
-    def _build(item, kwargs):
-        bld(source = [item],
-            name   = str(item)+':'+kwargs['cls_keyword'](None).lower(),
-            **kwargs)
-
-    if name in deps:
-        for _, item in copytargets(bld, name, items):
-            for kwargs in rules:
-                _build(item, kwargs)
-    else:
-        for item in items:
-            for kwargs in rules:
-                _build(item, kwargs)
+    "builds tasks for checking code"
+    return Linting.run(bld, name, items)
 
 def buildpymod(bld:Context, name:str, pysrc:Sequence):
-    u"builds a python module"
+    "builds a python module"
     if len(pysrc) == 0:
         return
     bld      (name = str(bld.path)+":py", features = "py", source = pysrc)
-    checkpy  (bld, name, pysrc)
+    Linting.run(bld, name, pysrc)
     copyfiles(bld, name, pysrc)
 
 def buildpyext(bld     : Context,
@@ -284,7 +311,7 @@ def buildpyext(bld     : Context,
                pysrc   : Sequence,
                csrc    : List,
                **kwargs):
-    u"builds a python extension"
+    "builds a python extension"
     if len(csrc) == 0:
         return
 
@@ -315,7 +342,7 @@ def buildpyext(bld     : Context,
 
 @conf
 def build_python(bld:Context, name:str, version:str, **kwargs):
-    u"builds a python module"
+    "builds a python module"
     if 'python' not in requirements:
         return
 
@@ -328,7 +355,7 @@ def build_python(bld:Context, name:str, version:str, **kwargs):
 
 @runall
 def options(opt:Context):
-    u"Adding conda options"
+    "Adding conda options"
     opt.add_option_group('condasetup options')\
         .add_option('-e', '--envname',
                     dest    = 'condaenv',
@@ -342,77 +369,122 @@ def options(opt:Context):
                     default = False,
                     help    = u"install only runtime modules")
 
-def condasetup(cnf:Context):
-    u"Installs conda"
-    envname = cnf.options.condaenv
-    rtime   = cnf.options.runtimeonly
-
-    try:
-        subprocess.check_output(['conda', '--version'])
-    except: # pylint: disable=bare-except
-        islin = sys.platform == 'linux'
-        site  = "https://repo.continuum.io/miniconda/Miniconda3-latest-"
-        site += 'Linux-x86_64.sh' if islin else "Windows-x86_64.exe"
-        down  = tempfile.mktemp(suffix = 'sh' if islin else 'exe')
-        request.urlretrieve(site, down)
-        if islin:
-            subprocess.check_call(['bash', down, '-b'])
-        else:
-            subprocess.check_call([down, '-b'])
-
-    import conda.cli.python_api as api
-    import conda.exceptions     as api_exc
-    from conda.base.context import context
-    context.always_yes = True
-    try:
-        api.run_command(api.Commands.LIST, "-n "+envname)
-    except api_exc.CondaEnvironmentNotFoundError:
-        api.run_command(api.Commands.CREATE, '-n '+envname  + " numpy")
-
-    jres = api.run_command(api.Commands.LIST, '-n '+envname+ ' --json ')
-    res  = {i['name']: (i['version'], i['channel']) for i in json.loads(jres[0])}
-    for name, version in requirements('python', runtimeonly = rtime).items():
-        if name == 'python':
-            continue
-
-        Logs.info("checking: %s=%s", name, version)
-        if name in res and LooseVersion(res[name][0]) >= version:
-            continue
-
-        if name in res:
-            cmd = '-n '+envname+ ' ' + name +'='+str(version)
-            if res[name][1] != 'defaults':
-                cmd += ' -c '+res[name][1]
-            try:
-                api.run_command(api.Commands.INSTALL, cmd)
-            except: # pylint: disable=bare-except
-                pass
+class CondaSetup:
+    "installs / updates a conda environment"
+    @staticmethod
+    def __download():
+        try:
+            subprocess.check_output(['conda', '--version'])
+        except: # pylint: disable=bare-except
+            islin = sys.platform == 'linux'
+            site  = "https://repo.continuum.io/miniconda/Miniconda3-latest-"
+            site += 'Linux-x86_64.sh' if islin else "Windows-x86_64.exe"
+            down  = tempfile.mktemp(suffix = 'sh' if islin else 'exe')
+            request.urlretrieve(site, down)
+            if islin:
+                subprocess.check_call(['bash', down, '-b'])
             else:
+                subprocess.check_call([down, '-b'])
+    @staticmethod
+    def __createenv(cnf):
+        "create conda environment"
+        import conda.cli.python_api as api
+        import conda.exceptions     as api_exc
+        envname = cnf.options.condaenv
+        try:
+            api.run_command(api.Commands.LIST, "-n "+envname)
+        except api_exc.CondaEnvironmentNotFoundError:
+            api.run_command(api.Commands.CREATE, '-n '+envname  + " numpy")
+
+    @classmethod
+    def __pipversion(cls, cnf, name, version):
+        "gets the version with pip"
+        cur = subprocess.check_output([cls.__pip(cnf), 'show', name]).split(b'\n')[1]
+        cur = cur.split(b':')[1].decode('utf-8').strip()
+        if LooseVersion(cur) < version:
+            return False
+        return True
+
+    @staticmethod
+    def __condaupdate(cnf, res, name, version):
+        "updates a module with conda"
+        if name not in res:
+            return False
+
+        import conda.cli.python_api as api
+        cmd = '-n '+cnf.options.condaenv+ ' ' + name +'='+str(version)
+        if res[name][1] != 'defaults':
+            cmd += ' -c '+res[name][1]
+        try:
+            api.run_command(api.Commands.INSTALL, cmd)
+        except: # pylint: disable=bare-except
+            return False
+        return True
+
+    @staticmethod
+    def __condainstall(cnf, name, version):
+        "installs a module with conda"
+        import conda.cli.python_api as api
+        cmd = '-n '+cnf.options.condaenv+ ' ' + name +'='+str(version)
+        for channel in ('', ' -c conda-forge'):
+            try:
+                api.run_command(api.Commands.INSTALL, cmd + channel)
+            except: # pylint: disable=bare-except
+                continue
+            return True
+        return False
+
+    @staticmethod
+    def __currentlist(cnf):
+        import conda.cli.python_api as api
+        jres = api.run_command(api.Commands.LIST, '-n '+cnf.options.condaenv+ ' --json ')
+        return {i['name']: (i['version'], i['channel']) for i in json.loads(jres[0])}
+
+    @staticmethod
+    def __pip(cnf):
+        import conda.cli.python_api as api
+        envs = json.loads(api.run_command(api.Commands.INFO, '--json')[0])['envs']
+        for env in envs:
+            if env.endswith(cnf.options.condaenv):
+                return env+"/bin/pip"
+        return 'pip'
+
+    @classmethod
+    def run(cls, cnf:Context):
+        "Installs conda"
+        rtime = cnf.options.runtimeonly
+
+        from conda.base.context import context
+        context.always_yes = True
+        cls.__download()
+        cls.__createenv(cnf)
+        res = cls.__currentlist(cnf)
+        for name, version in requirements('python', runtimeonly = rtime).items():
+            if name == 'python':
                 continue
 
-        cur = None
-        try:
-            cur = subprocess.check_output(['pip', 'show', name]).split(b'\n')[1]
-            cur = cur.split(b':')[1].decode('utf-8').strip()
-            if LooseVersion(cur) < version:
-                cur = None
-        except subprocess.CalledProcessError:
-            cmd = '-n '+envname+ ' ' + name +'='+str(version)
-            for channel in ('', ' -c conda-forge'):
-                try:
-                    api.run_command(api.Commands.INSTALL, cmd + channel)
-                except: # pylint: disable=bare-except
-                    continue
-                break
-            else:
-                subprocess.check_call(['pip', 'install', name])
-            continue
+            Logs.info("checking: %s=%s", name, version)
+            if name in res and LooseVersion(res[name][0]) >= version:
+                continue
 
-        if cur is None:
-            subprocess.check_call(['pip', 'install', name])
+            if cls.__condaupdate(cnf, res, name, version):
+                continue
+
+            try:
+                if cls.__pipversion(cnf, name, version):
+                    continue
+            except subprocess.CalledProcessError:
+                if cls.__condainstall(cnf, name, version):
+                    continue
+
+            subprocess.check_call([cls.__pip(cnf), 'install', name])
+
+def condasetup(cnf:Context):
+    "installs / updates a conda environment"
+    CondaSetup.run(cnf)
 
 def condaenv(name, reqs = None, stream = None):
-    u"creates a conda yaml file"
+    "creates a conda yaml file"
     if reqs is None:
         reqs = tuple(requirements.runtime('python').items())
 
@@ -434,7 +506,7 @@ def condaenv(name, reqs = None, stream = None):
             print(' - '+'='.join(item), file = stream)
 
 def runtest(bld, *names):
-    u"runs tests"
+    "runs tests"
     pyext = set(bld.env.pyextmodules)
     def _scan(_):
         deps  = list(pymoduledependencies(names, None) & pyext)
