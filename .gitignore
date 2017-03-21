@@ -4,5 +4,6 @@
 .*.un~
 build/
 wafbuilder/
-waf
+bin/waf3-*/
+bin/waf-*/
 pyenv/
