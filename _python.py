@@ -24,6 +24,8 @@ from ._utils                import (YES, Make, addconfigure, runall, copyargs,
 from ._cpp                  import Flags as CppFlags
 from ._requirements         import REQ as requirements
 
+_open = lambda x: open(x, 'r', encoding = 'utf-8')
+
 pytools.PYTHON_MODULE_TEMPLATE = '''
 import os, pkg_resources
 NAME = '%s'
@@ -158,8 +160,8 @@ def pymoduledependencies(pysrc, name = None):
     "detects dependencies"
     patterns = tuple(re.compile(r'^\s*'+pat) for pat in
                      (r'from\s+([\w.]+)\s+import\s+', r'import\s*(\w+)'))
-    mods     = set()
-    path     = lambda x: open(getattr(x, 'abspath', lambda: x)(), 'r')
+    mods = set()
+    path = lambda x: _open(getattr(x, 'abspath', lambda: x)())
     for item in pysrc:
         with closing(path(item)) as stream:
             for line in stream:
@@ -191,7 +193,7 @@ def haspyext(csrc):
     "detects whether pybind11 is used"
     pattern = re.compile(r'\s*#\s*include\s*["<]pybind11')
     for item in csrc:
-        with closing(open(item.abspath(), 'r')) as stream:
+        with closing(_open(item.abspath())) as stream:
             if any(pattern.match(line) is not None for line in stream):
                 return True
     return False
@@ -205,7 +207,9 @@ class Linting:
                   + '--msg-template="{path}:{line}:{column}:{C}: [{symbol}] {msg}" '
                   + '--disable=locally-disabled '
                   + '--reports=no')
-        if get_distribution("astroid").version == '1.4.8': # pylint: disable=no-member
+
+        if (get_distribution("astroid").version == '1.4.8' # pylint: disable=no-member
+                or sys.platform.startswith("win")):
             pylint += ' --disable=wrong-import-order,invalid-sequence-index'
 
         for name in ('', 'linting', '..', '../linting'):
@@ -236,7 +240,7 @@ class Linting:
         def _checkencoding(tsk):
             headers = '#!/usr/bin/env python3\n', '# -*- coding: utf-8 -*-\n'
 
-            with open(tsk.inputs[0].abspath(), 'r') as stream:
+            with _open(tsk.inputs[0].abspath()) as stream:
                 errs    = [True]*2
                 try:
                     for i, head in enumerate(headers):

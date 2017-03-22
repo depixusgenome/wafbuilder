@@ -32,21 +32,21 @@ class Flags(Make):
             return
 
         copt = opt.add_option_group(CXX_OPTION_GROUP)
+        if sys.platform.startswith('win'):
+            cxxflags = '/std:c++14 /EHsc'
+        else:
+            cxxflags = '-std=c++14 -g'
+
         copt.add_option('--cxxflags',
                         dest    = 'cxxflaglist',
-                        default = '-std=c++14 -g',
+                        default = cxxflags,
                         action  = 'store',
                         help    = 'define cxx flags')
         copt.add_option('--linkflags',
                         dest    = 'linkflaglist',
-                        default = '-fopenmp',
+                        default = '',
                         action  = 'store',
                         help    = 'define link flags')
-        copt.add_option('--no-openmp',
-                        dest     = 'noopenmp',
-                        default  = False,
-                        action   = 'store_true',
-                        help     = 'disable OpenMP')
 
     @staticmethod
     def convertFlags(cnf:Context, cxx, islinks = False):
@@ -84,14 +84,11 @@ class Flags(Make):
             '-Wsequence-point',
             ]
         if _ismsvc(cnf):
-            warnings = ['-Wall']
+            warnings = ['/W3']
 
         cxx   = cnf.options.cxxflaglist + ' ' + ' '.join(warnings)
 
         links = cnf.options.linkflaglist
-        if cnf.options.noopenmp:
-            cxx   = cxx.replace('-fopenmp', '')
-            links = links .replace('-fopenmp', '')
 
         cxx   = cls.convertFlags(cnf, cxx)
         links = cls.convertFlags(cnf, links)
@@ -191,12 +188,18 @@ def check_cpp_default(cnf:Context, name:str, version:Optional[str]):
         cond = 'ver >= num('+str(version).replace('.',',')+')'
         cnf.check_python_module(base, condition = cond)
 
-        line = (' -I'   + cnf.env.INCLUDES_PYEXT[0]
-                + ' -L' + cnf.env.LIBPATH_PYEXT[0]
-                + ' -l' + base + ' -lm')
-
-        libs = (pre+base+suf for pre in ('', 'lib') for suf in ('.so', '.dll'))
-        if not any((Path(cnf.env.LIBPATH_PYEXT[0]) / lib).exists() for lib in libs):
+        if sys.platform.startswith('win'):
+            root = (Path(cnf.env.INCLUDES_PYEXT[0])/'..'/'Library').resolve()
+            inc  = str((root/'include').resolve())
+            lib  = str((root/'lib').resolve())
+        else:
+            inc  = cnf.env.INCLUDES_PYEXT[0]
+            lib  = cnf.env.LIBPATH_PYEXT[0]
+        line = ' -I'   + inc + ' -L' + lib + ' -l' + base
+        if not sys.platform.startswith('win'):
+            line += ' -lm'
+        libs = tuple(pre+base+suf for pre in ('', 'lib') for suf in ('.so', '.dll', '.lib'))
+        if not any((Path(lib) / name).exists() for name in libs):
             line = line.replace('-l'+base, '')
 
         cnf.parse_flags(line, uselib_store = base)

@@ -2,6 +2,8 @@
 .lock-*
 .waf*
 .*.un~
+*.*~
+.*.swp
 build/
 wafbuilder/
 bin/waf3-*/
