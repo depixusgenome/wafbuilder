@@ -33,7 +33,7 @@ def build_coffee(bld:Context, name:str, _1, **_2):
 
     coffees = bld.path.ant_glob('**/*.coffee')
     if len(coffees):
-        if 'COFFEE' in bld.env:
+        if 'COFFEE' in bld.env and bld.options.APP_PATH is None:
             bld(source = coffees)
         copyfiles(bld, name, coffees)
 

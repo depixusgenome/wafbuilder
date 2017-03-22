@@ -8,12 +8,13 @@ from functools  import wraps
 
 from waflib.Context import Context
 from waflib.Build   import BuildContext
+from waflib.Configure       import conf
 
 from ._defaults     import wscripted, defaultwscript
 from ._requirements import REQ as requirements
 from ._utils        import addmissing, appname, appdir, copyfiles, runall, patch, getlocals
 from ._python       import checkpy, findpyext, condaenv, runtest, condasetup
-from .git           import version
+from .git           import version, lasthash, lastdate, isdirty
 
 def top()-> str:
     u"returns top path"
@@ -137,12 +138,36 @@ def recurse(builder, items):
         return _wrap
     return _wrapper
 
+@conf
+def build_python_version_file(bld:Context):
+    "creates a version.py file"
+    if bld.options.APP_PATH is None:
+        target = 'version.py'
+    else:
+        target = Path(str(bld.options.APP_PATH)).stem+'/version.py'
+
+    bld(features = 'subst',
+        source   = bld.srcnode.find_resource(__package__+'/_version.template'),
+        target   = target,
+        name     = str(bld.path)+":version",
+        version  = version(),
+        lasthash = lasthash(),
+        lastdate = lastdate(),
+        isdirty  = isdirty(),
+        cpp_compiler_name = bld.cpp_compiler_name())
+
 addmissing()
 
 @patch
 def postfix_configure(cnf:Context):
     u"Default configure"
     requirements.check(cnf)
+
+@patch
+def prefix_build(bld:Context):
+    u"Default configure"
+    if not hasattr(bld.options, 'APP_PATH'):
+        bld.options.APP_PATH = None
 
 __builtins__['make']    = make                  # type: ignore
 __builtins__['require'] = requirements.require  # type: ignore

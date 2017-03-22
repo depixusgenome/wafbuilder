@@ -1,0 +1,23 @@
+#!/usr/bin/env python3
+# encoding: utf-8
+"Build information"
+
+def version ():
+    "git version"
+    return "@version@"
+
+def lasthash():
+    "git hash"
+    return "@lasthash@"
+
+def hashdate():
+    "git hash date"
+    return "@lastdate@"
+
+def isdirty ():
+    "git hash"
+    return @isdirty@
+
+def compiler():
+    "compiler used"
+    return "@cpp_compiler_name@'

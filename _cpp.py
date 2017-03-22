@@ -10,7 +10,8 @@ from distutils.version  import LooseVersion
 from waflib             import Utils
 from waflib.Configure   import conf
 from waflib.Context     import Context
-from ._utils            import YES, runall, addmissing, Make, copyargs, loading
+from ._utils            import (YES, runall, addmissing,
+                                Make, copyargs, copyroot, loading)
 from ._requirements     import REQ as requirements
 
 IS_MAKE          = YES
@@ -229,7 +230,7 @@ def build_cpp(bld:Context, name:str, version:str, **kwargs):
     csrc = [i for i in csrc if csrc is not prog]
 
     args = copyargs(kwargs)
-    args.setdefault('target', bld.bldnode.path_from(bld.bldnode)+"/"+name)
+    args.setdefault('target', copyroot(bld,None).make_node(name))
 
     def _template(post):
         res = bld.srcnode.find_resource(__package__+'/_program.template')
