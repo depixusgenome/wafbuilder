@@ -20,4 +20,4 @@ def isdirty ():
 
 def compiler():
     "compiler used"
-    return "@cpp_compiler_name@'
+    return "@cpp_compiler_name@"
