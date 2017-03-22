@@ -306,7 +306,7 @@ def buildpymod(bld:Context, name:str, pysrc:Sequence):
     if len(pysrc) == 0:
         return
 
-    if bld.options.APP_PATH is None:
+    if getattr(bld.options, 'APP_PATH', None) is None:
         bld      (name = str(bld.path)+":py", features = "py", source = pysrc)
         Linting.run(bld, name, pysrc)
     copyfiles(bld, name, pysrc)

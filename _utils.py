@@ -177,9 +177,7 @@ def addmissing(glob = None):
 
 def copyroot(bld:Context, arg):
     "returns the root where items are copied"
-    root = bld.options.APP_PATH
-    if root is None:
-        root = bld.bldnode
+    root = getattr(bld.options, 'APP_PATH', bld.bldnode)
     return root.make_node(arg) if isinstance(arg, str) else root
 
 def copytargets(bld:Context, arg, items):

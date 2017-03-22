@@ -141,7 +141,7 @@ def recurse(builder, items):
 @conf
 def build_python_version_file(bld:Context):
     "creates a version.py file"
-    if bld.options.APP_PATH is None:
+    if getattr(bld.options, 'APP_PATH', None) is None:
         target = 'version.py'
     else:
         target = Path(str(bld.options.APP_PATH)).stem+'/version.py'
@@ -162,12 +162,6 @@ addmissing()
 def postfix_configure(cnf:Context):
     u"Default configure"
     requirements.check(cnf)
-
-@patch
-def prefix_build(bld:Context):
-    u"Default configure"
-    if not hasattr(bld.options, 'APP_PATH'):
-        bld.options.APP_PATH = None
 
 __builtins__['make']    = make                  # type: ignore
 __builtins__['require'] = requirements.require  # type: ignore
