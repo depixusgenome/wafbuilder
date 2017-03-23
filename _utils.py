@@ -28,16 +28,14 @@ def getlocals(glob = None, ind = 1) -> dict:
 def appdir(iframe: int  = None) -> Path:
     "returns directory"
     if iframe is None:
-        mymod  = __file__.replace('\\', '/')
-        mymod  = mymod[:mymod.rfind('/')]
-        myroot = mymod[:mymod.rfind('/')]
+        mymod  = str(Path(__file__).parent)
+        myroot = str(Path(__file__).parent.parent)
         for frame in inspect.getouterframes(inspect.currentframe()):
-            fname = frame.filename.replace('\\', '/')
-            if fname.startswith('<') or mymod in fname:
-                continue
-            if myroot not in fname:
+            fname = str(Path(frame.filename))
+            if fname.startswith('<') or mymod in fname or myroot not in fname:
                 continue
             break
+            
         else:
             raise AttributeError("Could not find appname frame")
 

@@ -16,7 +16,8 @@ def version(path = None) -> str:
     cmd = 'describe', '--always' # type: Any
     if path is not None:
         commit = _cmd('log', '--format=%H', '-1', '--', str(path))
-        cmd   += '--', commit.strip()
+        if len(commit.strip()):
+            cmd   += '--', commit.strip()
     else:
         cmd   +=  '--dirty=+',
     return _cmd(*cmd)
