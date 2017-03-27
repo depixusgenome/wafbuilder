@@ -455,7 +455,7 @@ class CondaSetup:
 
     def __condaupdate(self, res, name, version):
         "updates a module with conda"
-        if res.get(name, (0, '<pip>'))[1] != '<pip>':
+        if res.get(name, (0, '<pip>'))[1] == '<pip>':
             return False
 
         cmd = '-n '+self.envname+ ' ' + name
@@ -497,17 +497,22 @@ class CondaSetup:
         return res
 
     def __pip(self):
-        envs = json.loads(self.__read('info --json').decode('utf-8'))['envs']
+        info = json.loads(self.__read('info --json').decode('utf-8'))
+        envs = info['envs']
+        def _get(env):
+            if sys.platform.startswith('win'):
+                path = Path(env)/"Scripts"/"pip.exe"
+            else:
+                path = Path(env)/"bin"/"pip"
+            if not path.exists():
+                self.__condainstall('pip', None)
+            return str(path.resolve())
+
         for env in envs:
             if env.endswith(self.envname):
-                if sys.platform.startswith('win'):
-                    path = Path(env)/"Scripts"/"pip.exe"
-                else:
-                    path = Path(env)/"bin"/"pip"
-                if not path.exists():
-                    self.__condainstall('pip', None)
-                return str(path.resolve())
-        return 'pip'
+                return _get(env)
+
+        return _get(info['default_prefix'])
 
     def __python_run(self):
         "Installs python modules"
@@ -543,12 +548,14 @@ class CondaSetup:
                     and self.__condainstall(name, version)):
                 continue
 
+            cmd = [self.__pip(), 'install']
             if version is None:
-                subprocess.check_call([self.__pip(), 'install', name])
+                cmd += [name]
             elif self.minvers:
-                subprocess.check_call([self.__pip(), 'install', "'name=="+str(version)+"'"])
+                cmd += ["%s==%s" % (name, version)]
             else:
-                subprocess.check_call([self.__pip(), 'install', '-U', "'name>="+str(version)+"'"])
+                cmd += ['-U', "%s>=%s" % (name, version)]
+            subprocess.check_call(cmd)
 
     def __coffee_run(self):
         "Installs coffee/js modules"
