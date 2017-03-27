@@ -24,6 +24,8 @@ from ._utils                import (YES, Make, addconfigure, runall, copyargs,
 from ._cpp                  import Flags as CppFlags
 from ._requirements         import REQ as requirements
 
+CHANNELS = ['', ' -c conda-forge']
+
 _open = lambda x: open(x, 'r', encoding = 'utf-8')
 
 pytools.PYTHON_MODULE_TEMPLATE = '''
@@ -368,6 +370,10 @@ class CondaSetup:
     "installs / updates a conda environment"
     def __init__(self, cnf = None, **kwa):
         self.envname = kwa.get('envname',     getattr(cnf, 'condaenv',   'root'))
+        self.packages = kwa.get('packages', getattr(cnf, 'packages', '').split(','))
+        if self.packages == ['']:
+            self.packages = []
+
         self.minvers = kwa.get('minversion',  getattr(cnf, 'minversion',  False))
         self.rtime   = kwa.get('runtimeonly', getattr(cnf, 'runtimeonly', False))
         self.copy    = kwa.get('copy', None)
@@ -394,11 +400,31 @@ class CondaSetup:
                        default = False,
                        help    = u"install only runtime modules")
 
+        grp.add_option('-p', '--packages',
+                       dest    = 'packages',
+                       action  = 'store',
+                       default = '',
+                       help    = u"consider only these packages")
+
     @staticmethod
-    def __download():
+    def __run(cmd):
         try:
-            subprocess.check_output(['conda', '--version'])
+            Logs.info('conda '+cmd)
+            subprocess.check_call(['conda']+cmd.split(' '),
+                                  stdout=subprocess.DEVNULL,
+                                  stderr=subprocess.DEVNULL)
         except: # pylint: disable=bare-except
+            return True
+        return False
+
+    @staticmethod
+    def __read(cmd):
+        return subprocess.check_output(['conda']+cmd.split(' '),
+                                       stderr=subprocess.DEVNULL)
+
+    @classmethod
+    def __download(cls):
+        if cls.__run('--version'):
             islin = sys.platform == 'linux'
             site  = "https://repo.continuum.io/miniconda/Miniconda3-latest-"
             site += 'Linux-x86_64.sh' if islin else "Windows-x86_64.exe"
@@ -411,23 +437,13 @@ class CondaSetup:
 
     def __createenv(self):
         "create conda environment"
-        import conda.cli.python_api as api
-        import conda.exceptions     as api_exc
-        try:
-            api.run_command(api.Commands.LIST, "-n "+self.envname)
-        except api_exc.CondaEnvironmentNotFoundError:
+        if self.__run('list -n '+ self.envname):
+            version = requirements('python', 'numpy')
+            cmd =  'create --yes -n '+self.envname  + " numpy>="+str(version)
             if self.minvers:
-                version = requirements('python', 'numpy')
-                cmd     =  '-n '+self.envname  + " numpy="+str(version)
-                try:
-                    api.run_command(api.Commands.CREATE, cmd)
-                except: # pylint: disable=bare-except
-                    pass
-                else:
-                    return
+                cmd = cmd.replace('>=', '=')
 
-            cmd =  '-n '+self.envname  + " numpy"
-            api.run_command(api.Commands.CREATE, cmd)
+            self.__run(cmd)
 
     def __pipversion(self, name, version):
         "gets the version with pip"
@@ -442,54 +458,46 @@ class CondaSetup:
         if name not in res:
             return False
 
-        if not self.minvers:
-            version = None
-
         cmd = '-n '+self.envname+ ' ' + name
         if version is not None:
-            cmd += '=' + str(version)
+            cmd += ('=' if self.minvers else '>=') + str(version)
 
-        if res[name][1] != 'defaults':
+        if res[name][1] not in ('defaults', ''):
             cmd += ' -c '+res[name][1]
 
-        import conda.cli.python_api as api
-        try:
-            api.run_command(api.Commands.INSTALL, cmd)
-        except: # pylint: disable=bare-except
-            if version is None:
-                return False
+        if self.__run('install '+cmd+' --yes') and version is None:
             return self.__condaupdate(res, name, None)
         return True
 
     def __condainstall(self, name, version):
         "installs a module with conda"
-        if not self.minvers:
-            version = None
-
         cmd = '-n '+self.envname+ ' ' + name
         if version is not None:
-            cmd += '='+str(version)
+            cmd += ('=' if self.minvers else '>=') + str(version)
 
-        import conda.cli.python_api as api
-        for channel in ('', ' -c conda-forge'):
-            try:
-                api.run_command(api.Commands.INSTALL, cmd + channel)
-            except: # pylint: disable=bare-except
-                Logs.info("failed on channel '%s'", channel)
-                continue
-            return True
+        for channel in CHANNELS:
+            if not self.__run('install ' + cmd + channel+ ' --yes'):
+                return True
+            Logs.info("failed on channel '%s'", channel)
+
         if version is not None:
             return self.__condainstall(name, None)
         return False
 
     def __currentlist(self):
-        import conda.cli.python_api as api
-        jres = api.run_command(api.Commands.LIST, '-n '+self.envname+ ' --json ')
-        return {i['name']: (i['version'], i['channel']) for i in json.loads(jres[0])}
+        res = {}
+        for line in self.__read('list -n '+self.envname).decode('utf-8').split('\n'):
+            if len(line) == 0 or line[0] == '#':
+                continue
+            vals         = line.split()
+            channel      = vals[-1]
+            if len(vals) == 3 and channel != '<pip>':
+                channel = ''
+            res[vals[0]] = vals[1], channel
+        return res
 
     def __pip(self):
-        import conda.cli.python_api as api
-        envs = json.loads(api.run_command(api.Commands.INFO, '--json')[0])['envs']
+        envs = json.loads(self.__read('info --json').decode('utf-8'))['envs']
         for env in envs:
             if env.endswith(self.envname):
                 if sys.platform.startswith('win'):
@@ -508,32 +516,25 @@ class CondaSetup:
                    for i, j in requirements('cpp', runtimeonly = self.rtime).items()
                    if i.startswith('python_'))
         cur  = self.__currentlist()
-        pips = set()
-        chan = {'defaults': {'python': str(cur['python'][0])}}
+        chan = {'': {'python': str(cur['python'][0])}}
         for name in req:
             if name == 'python':
                 continue
 
-            if name in cur:
-                chan.setdefault(cur[name][1], {})[name] = str(cur[name][0])
-            else:
-                pips.add(name)
+            chan.setdefault(cur[name][1], {})[name] = str(cur[name][0])
 
-        cmd = ' '.join(i+'='+j for i, j in chan.pop('defaults').items())
+        pips = chan.pop('<pip>', [])
+        cmd  = ' '.join(i+'='+j for i, j in chan.pop('').items())
         if len(pips):
             cmd += ' pip '
         cmd += ' -p '+ self.copy
 
-        from conda.base.context import context
-        import conda.cli.python_api as api
-        context.always_yes = True
-        print(cmd)
-        api.run_command(api.Commands.CREATE, cmd)
+        self.__run('create '+cmd+' --yes')
 
         for channel, items in chan.items():
             cmd  = ' '.join(i+'='+j for i, j in items.items())
             cmd += ' -p '+ self.copy + ' -c ' + channel
-            api.run_command(api.Commands.INSTALL, cmd)
+            self.__run('install ' + cmd + ' --yes')
 
         if len(pips):
             if sys.platform.startswith('win'):
@@ -543,12 +544,10 @@ class CondaSetup:
             pippath = str(path.resolve())
             for name in pips:
                 subprocess.check_call([pippath, 'install', name])
-            api.run_command(api.Commands.REMOVE, 'pip -p '+ self.copy)
+        self.__run('remove pip -p ' + self.copy + ' --yes')
 
     def run(self):
         "Installs conda"
-        from conda.base.context import context
-        context.always_yes = True
         self.__download()
         self.__createenv()
         res  = self.__currentlist()
@@ -556,6 +555,9 @@ class CondaSetup:
         itms.update((i[len('python_'):], j)
                     for i, j in requirements('cpp', runtimeonly = self.rtime).items()
                     if i.startswith('python_'))
+        if len(self.packages):
+            itms = {i: j for i, j in itms.items() if i in self.packages}
+
         for name, version in itms.items():
             if name == 'python':
                 continue
@@ -583,7 +585,7 @@ class CondaSetup:
 
 def condasetup(cnf:Context = None, **kwa):
     "installs / updates a conda environment"
-    cset = CondaSetup(cnf, **kwa)
+    cset = CondaSetup(cnf.options, **kwa)
     if cset.copy is None:
         cset.run()
     else:
