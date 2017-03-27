@@ -455,7 +455,7 @@ class CondaSetup:
 
     def __condaupdate(self, res, name, version):
         "updates a module with conda"
-        if name not in res:
+        if res.get(name, (0, '<pip>'))[1] != '<pip>':
             return False
 
         cmd = '-n '+self.envname+ ' ' + name
@@ -509,6 +509,65 @@ class CondaSetup:
                 return str(path.resolve())
         return 'pip'
 
+    def __python_run(self):
+        "Installs python modules"
+        res  = self.__currentlist()
+        itms = requirements('python', runtimeonly = self.rtime)
+        itms.update((i[len('python_'):], j)
+                    for i, j in requirements('cpp', runtimeonly = self.rtime).items()
+                    if i.startswith('python_'))
+        if len(self.packages):
+            itms = {i: j for i, j in itms.items() if i in self.packages}
+
+        for name, version in itms.items():
+            if name == 'python':
+                continue
+
+            Logs.info("checking: %s=%s", name, version)
+            if (name in res
+                    and LooseVersion(res[name][0]) >= version
+                    and self.minvers):
+                continue
+
+            if self.__condaupdate(res, name, version):
+                continue
+
+            try:
+                if (self.__pipversion(name, version)
+                        and self.minvers):
+                    continue
+            except subprocess.CalledProcessError:
+                pass
+
+            if (res.get(name, (0, 0))[1] != '<pip>'
+                    and self.__condainstall(name, version)):
+                continue
+
+            if version is None:
+                subprocess.check_call([self.__pip(), 'install', name])
+            elif self.minvers:
+                subprocess.check_call([self.__pip(), 'install', "'name=="+str(version)+"'"])
+            else:
+                subprocess.check_call([self.__pip(), 'install', '-U', "'name>="+str(version)+"'"])
+
+    def __coffee_run(self):
+        "Installs coffee/js modules"
+        itms  = requirements('coffee', runtimeonly = self.rtime)
+        if len(self.packages):
+            itms = {i: j for i, j in itms.items() if i in self.packages}
+
+        if len(itms) == 0:
+            return
+
+        pref = json.loads(self.__read('info --json').decode('utf-8'))['default_prefix']
+        npm  = str((Path(pref)/'bin'/'npm'))
+        assert Path(npm).exists()
+
+        for info in itms.items():
+            if info[0] == 'coffee':
+                info = 'coffeescript', info[1]
+            subprocess.check_call(npm+' install --global  %s>=%s' % (info))
+
     def copyenv(self):
         "copies a environment"
         req = requirements('python', runtimeonly = self.rtime)
@@ -542,46 +601,16 @@ class CondaSetup:
             else:
                 path = Path(self.copy)/"bin"/"pip"
             pippath = str(path.resolve())
-            for name in pips:
-                subprocess.check_call([pippath, 'install', name])
+            for info in pips.items():
+                subprocess.check_call([pippath, 'install', "'%s=%s'" % info])
         self.__run('remove pip -p ' + self.copy + ' --yes')
 
     def run(self):
         "Installs conda"
         self.__download()
         self.__createenv()
-        res  = self.__currentlist()
-        itms = requirements('python', runtimeonly = self.rtime)
-        itms.update((i[len('python_'):], j)
-                    for i, j in requirements('cpp', runtimeonly = self.rtime).items()
-                    if i.startswith('python_'))
-        if len(self.packages):
-            itms = {i: j for i, j in itms.items() if i in self.packages}
-
-        for name, version in itms.items():
-            if name == 'python':
-                continue
-
-            Logs.info("checking: %s=%s", name, version)
-            if (name in res
-                    and LooseVersion(res[name][0]) >= version
-                    and self.minvers):
-                continue
-
-            if self.__condaupdate(res, name, version):
-                continue
-
-            try:
-                if (self.__pipversion(name, version)
-                        and self.minvers):
-                    continue
-            except subprocess.CalledProcessError:
-                pass
-
-            if self.__condainstall(name, version):
-                continue
-
-            subprocess.check_call([self.__pip(), 'install', name])
+        self.__python_run()
+        self.__coffee_run()
 
 def condasetup(cnf:Context = None, **kwa):
     "installs / updates a conda environment"
