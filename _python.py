@@ -567,13 +567,16 @@ class CondaSetup:
             return
 
         pref = json.loads(self.__read('info --json').decode('utf-8'))['default_prefix']
-        npm  = str((Path(pref)/'bin'/'npm'))
+        if sys.platform.startswith('win'):
+            npm  = str((Path(pref)/'npm'))
+        else:
+            npm  = str((Path(pref)/'bin'/'npm'))
         assert Path(npm).exists()
 
         for info in itms.items():
             if info[0] == 'coffee':
                 info = 'coffeescript', info[1]
-            subprocess.check_call(npm+' install --global  %s>=%s' % (info))
+            subprocess.check_call((npm+' install --global  %s>=%s' % info).split())
 
     def copyenv(self):
         "copies a environment"
@@ -591,8 +594,6 @@ class CondaSetup:
 
         pips = chan.pop('<pip>', [])
         cmd  = ' '.join(i+'='+j for i, j in chan.pop('').items())
-        if len(pips):
-            cmd += ' pip '
         cmd += ' -p '+ self.copy
 
         self.__run('create '+cmd+' --yes')
@@ -610,14 +611,14 @@ class CondaSetup:
             pippath = str(path.resolve())
             for info in pips.items():
                 subprocess.check_call([pippath, 'install', "'%s=%s'" % info])
-        self.__run('remove pip -p ' + self.copy + ' --yes')
 
     def run(self):
         "Installs conda"
         self.__download()
         self.__createenv()
         self.__python_run()
-        self.__coffee_run()
+        if not sys.platform.startswith("win"):
+            self.__coffee_run()
 
 def condasetup(cnf:Context = None, **kwa):
     "installs / updates a conda environment"
