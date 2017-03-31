@@ -153,6 +153,11 @@ def check_python_mypy(cnf, name, version):
     cmd = [getattr(cnf.env, name.upper())[0], "--fast-parser", "-c", '"print(1)"']
     cnf.cmd_and_log(cmd)
 
+@requirements.addcheck
+def check_python_nodejs(cnf, _, version):
+    "checks python's nodejs"
+    requirements.programversion(cnf, 'node', version)
+
 @runall
 def configure(_:Context):
     "get python headers and modules"
