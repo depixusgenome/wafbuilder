@@ -7,7 +7,9 @@ import subprocess
 
 def _cmd(*args) -> str:
     if any(os.path.exists('../'*i+'.git') for i in range(5)):
-        return subprocess.check_output(('git',)+tuple(args)).strip().decode('utf-8')
+        return (subprocess.check_output(('git',)+tuple(args),
+                                        stderr = subprocess.DEVNULL)
+                .strip().decode('utf-8'))
     else:
         return ''
 
