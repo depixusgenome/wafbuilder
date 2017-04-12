@@ -384,6 +384,13 @@ class CondaSetup:
         self.rtime   = kwa.get('runtimeonly', getattr(cnf, 'runtimeonly', False))
         self.copy    = kwa.get('copy', None)
 
+        if getattr(cnf, 'pinned', '') == '':
+            lst = requirements.pinned()
+            lst.extend(i.replace('python-', '') for i in lst if 'python-' in i)
+        else:
+            lst = [i.strip().lower() for i in getattr(cnf, 'pinned', '').split(',')]
+        self.pinned  = kwa.get('pinned',  lst)
+
     @staticmethod
     def options(opt:Context):
         "defines options for conda setup"
@@ -393,6 +400,12 @@ class CondaSetup:
                        action  = 'store',
                        default = 'root',
                        help    = u"conda environment name")
+
+        grp.add_option('--pinned',
+                       dest    = 'pinned',
+                       action  = 'store',
+                       default = '',
+                       help    = u"packages with pinned versions")
 
         grp.add_option('-m', '--min-version',
                        dest    = 'minversion',
@@ -446,10 +459,13 @@ class CondaSetup:
         if self.__run('list -n '+ self.envname):
             version = requirements('python', 'numpy')
             cmd =  'create --yes -n '+self.envname  + " numpy>="+str(version)
-            if self.minvers:
+            if self.__ismin('numpy'):
                 cmd = cmd.replace('>=', '=')
 
             self.__run(cmd)
+
+    def __ismin(self, name):
+        return self.minvers or name.lower() in self.pinned
 
     def __pipversion(self, name, version):
         "gets the version with pip"
@@ -466,7 +482,7 @@ class CondaSetup:
 
         cmd = '-n '+self.envname+ ' ' + name
         if version is not None:
-            cmd += ('=' if self.minvers else '>=') + str(version)
+            cmd += ('=' if self.__ismin(name) else '>=') + str(version)
 
         if res[name][1] not in ('defaults', ''):
             cmd += ' -c '+res[name][1]
@@ -479,7 +495,7 @@ class CondaSetup:
         "installs a module with conda"
         cmd = '-n '+self.envname+ ' ' + name
         if version is not None:
-            cmd += ('=' if self.minvers else '>=') + str(version)
+            cmd += ('=' if self.__ismin(name) else '>=') + str(version)
 
         for channel in CHANNELS:
             if not self.__run('install ' + cmd + channel+ ' --yes'):
@@ -537,7 +553,7 @@ class CondaSetup:
             Logs.info("checking: %s=%s", name, version)
             if (name in res
                     and LooseVersion(res[name][0]) >= version
-                    and self.minvers):
+                    and self.__ismin(name)):
                 continue
 
             if self.__condaupdate(res, name, version):
@@ -545,7 +561,7 @@ class CondaSetup:
 
             try:
                 if (self.__pipversion(name, version)
-                        and self.minvers):
+                        and self.__ismin(name)):
                     continue
             except subprocess.CalledProcessError:
                 pass
@@ -557,7 +573,7 @@ class CondaSetup:
             cmd = [self.__pip(), 'install']
             if version is None:
                 cmd += [name]
-            elif self.minvers:
+            elif self.__ismin(name):
                 cmd += ["%s==%s" % (name, version)]
             else:
                 cmd += ['-U', "%s>=%s" % (name, version)]
