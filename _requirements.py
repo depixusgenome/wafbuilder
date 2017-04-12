@@ -162,7 +162,7 @@ class RequirementManager:
         else:
             return {name: self.__version(origs)
                     for name, origs in self._reqs[lang].items()
-                    if not any(isrt for _, isrt in origs.values())}
+                    if not any(isrt for _1, isrt, _2 in origs.values())}
 
     def runtime(self, lang = None):
         u"returns build and runtime dependencies"
@@ -171,7 +171,7 @@ class RequirementManager:
         else:
             return {name: self.__version(origs)
                     for name, origs in self._reqs[lang].items()
-                    if any(isrt for _, isrt in origs.values())}
+                    if any(isrt for _1, isrt, _2 in origs.values())}
 
     def __call__(self, lang = None, name = None, runtimeonly = False):
         u"returns build and runtime dependencies"
