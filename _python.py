@@ -5,6 +5,7 @@ import subprocess
 import urllib.request as request
 import tempfile
 import re
+import os
 import sys
 import json
 from   pathlib              import Path
@@ -581,7 +582,9 @@ class CondaSetup:
         for info in itms.items():
             if info[0] == 'coffee':
                 info = 'coffeescript', info[1]
-            subprocess.check_call((npm+' install --global  %s>=%s' % info).split())
+            # for some reason, subprocess.check_call does not succeed:
+            # it seems npm parses the command incorrectly
+            os.system(npm+' install --global  %s --range >=%s' % info)
 
     def copyenv(self):
         "copies a environment"
