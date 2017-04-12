@@ -536,6 +536,13 @@ class CondaSetup:
 
         return _get(info['default_prefix'])
 
+    def __isgood(self, name, version, res):
+        if name not in res:
+            return False
+        if self.__ismin(name):
+            return LooseVersion(res[name][0]) == version
+        return LooseVersion(res[name][0]) >= version
+
     def __python_run(self):
         "Installs python modules"
         res  = self.__currentlist()
@@ -551,9 +558,7 @@ class CondaSetup:
                 continue
 
             Logs.info("checking: %s=%s", name, version)
-            if (name in res
-                    and LooseVersion(res[name][0]) >= version
-                    and self.__ismin(name)):
+            if self.__isgood(name, version, res):
                 continue
 
             if self.__condaupdate(res, name, version):
