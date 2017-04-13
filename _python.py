@@ -593,19 +593,30 @@ class CondaSetup:
         if len(itms) == 0:
             return
 
-        pref = json.loads(self.__read('info --json').decode('utf-8'))['default_prefix']
-        if sys.platform.startswith('win'):
-            npm  = str((Path(pref)/'npm'))
+        npm  = None
+        for env in json.loads(self.__read('info --json').decode('utf-8'))['envs']:
+            if env.endswith(self.envname):
+                if sys.platform.startswith('win'):
+                    path = Path(env)/"Scripts"/"npm"
+                    if not path.exists():
+                        path = Path(env)/"npm"
+                else:
+                    path = Path(env)/"bin"/"npm"
+
+                assert path.exists()
+
+                npm = str(path)
+                break
         else:
-            npm  = str((Path(pref)/'bin'/'npm'))
-        assert Path(npm).exists()
+            assert False
 
         for info in itms.items():
             if info[0] == 'coffee':
                 info = 'coffeescript', info[1]
-            # for some reason, subprocess.check_call does not succeed:
-            # it seems npm parses the command incorrectly
-            os.system(npm+' install --global  %s --range >=%s' % info)
+
+            cmd = npm+' install --global  %s' % info[0]
+            Logs.info(cmd)
+            os.system(cmd)
 
     def copyenv(self):
         "copies a environment"
@@ -613,6 +624,7 @@ class CondaSetup:
         req.update((i[len('python_'):], j)
                    for i, j in requirements('cpp', runtimeonly = self.rtime).items()
                    if i.startswith('python_'))
+
         cur  = self.__currentlist()
         chan = {'': {'python': str(cur['python'][0])}}
         for name in req:
