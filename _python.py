@@ -593,22 +593,29 @@ class CondaSetup:
         if len(itms) == 0:
             return
 
+        def _get(env):
+            if sys.platform.startswith('win'):
+                path = Path(env)/"Scripts"/"npm"
+                if not path.exists():
+                    path = Path(env)/"npm"
+            else:
+                path = Path(env)/"bin"/"npm"
+
+            assert path.exists(), path
+
+            return str(path)
+
         npm  = None
-        for env in json.loads(self.__read('info --json').decode('utf-8'))['envs']:
+        info = json.loads(self.__read('info --json').decode('utf-8'))
+        for env in info['envs']:
             if env.endswith(self.envname):
-                if sys.platform.startswith('win'):
-                    path = Path(env)/"Scripts"/"npm"
-                    if not path.exists():
-                        path = Path(env)/"npm"
-                else:
-                    path = Path(env)/"bin"/"npm"
-
-                assert path.exists()
-
-                npm = str(path)
-                break
+                npm = _get(env)
+                if npm is not None:
+                    break
         else:
-            assert False
+            if self.envname == 'root':
+                npm = _get(info['default_prefix'])
+        assert npm is not None
 
         for info in itms.items():
             if info[0] == 'coffee':
