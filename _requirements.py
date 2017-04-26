@@ -139,7 +139,7 @@ class RequirementManager:
                     for lang in self._reqs}
 
         def _get(lang, name):
-            version = max(vers for vers, _ in self._reqs[lang][name].values())
+            version = max(vers[0] for vers in self._reqs[lang][name].values())
             self._checks[lang].get(name, defaults[lang])(cnf, name, version)
 
         for lang, items in self._reqs.items():
