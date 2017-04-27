@@ -714,4 +714,4 @@ def runtest(bld, *names):
         scan        = _scan,
         cls_keyword = lambda _: 'Pytest')
 
-addmissing()
+addmissing(locals())

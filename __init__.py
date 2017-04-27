@@ -96,7 +96,7 @@ def make(glob = None, **kw):
         for name in kw.get("builders", _DEFAULT):
             __import__(__name__+'._'+_get(name))
 
-    def configure(cnf:Context):
+    def configure(cnf:Context): # pylint: disable=redefined-outer-name
         u"configures a python module"
         for name in kw.get("builders", _DEFAULT):
             getattr(cnf, 'configure_'+_get(name), lambda: None)()
@@ -156,10 +156,10 @@ def build_python_version_file(bld:Context):
         isdirty  = isdirty(),
         cpp_compiler_name = bld.cpp_compiler_name())
 
-addmissing()
+addmissing(locals())
 
-@patch
-def postfix_configure(cnf:Context):
+@patch('postfix', locals())
+def configure(cnf:Context):
     u"Default configure"
     requirements.check(cnf)
 

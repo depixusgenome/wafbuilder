@@ -240,7 +240,7 @@ def patch(arg = None, locs = None):
     >>> def prefix_configure(cnf):
     >>>     print('this happens first!')
     """
-    locs = getlocals()
+    locs = getlocals(locs)
     def _wrapper(fcn):
         name = fcn.__name__
         pre  = name.startswith('pre_') or name.startswith('prefix_')

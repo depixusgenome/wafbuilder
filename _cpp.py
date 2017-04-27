@@ -265,4 +265,4 @@ def cpp_compiler_name(cnf:Context):
 
     return cnf.env['COMPILER_CXX']+"-"+str(curr)
 
-addmissing()
+addmissing(locals())

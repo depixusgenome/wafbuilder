@@ -17,7 +17,7 @@ def wscripted(path) -> Sequence[str]:
             if ((path/x/WSCRIPT_FILE).exists()
                 or (path/x).resolve()/WSCRIPT_FILE in _DEFAULT_WAFS)]
 
-def defaultwscript(path, code = 'make()'):
+def defaultwscript(path, code = 'make(locals())'):
     u"""
     Defines default wscripts for all children in a directory.
     This is dynamic.
