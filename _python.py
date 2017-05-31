@@ -151,7 +151,11 @@ def check_python_astroid(cnf, name, version):
 def check_python_mypy(cnf, name, version):
     "checks python's mypy"
     requirements.programversion(cnf, name, version)
-    cmd = [getattr(cnf.env, name.upper())[0], "--fast-parser", "-c", '"print(1)"']
+    cmd = getattr(cnf.env, name.upper())+ ["--version"]
+    if float(cnf.cmd_and_log(cmd).split()[1]) <= 0.501:
+        cnf.env[name.upper()] += ['--fast-parser']
+
+    cmd = getattr(cnf.env, name.upper()) + ["-c", '"print(1)"']
     cnf.cmd_and_log(cmd)
 
 @requirements.addcheck
@@ -233,7 +237,7 @@ class Linting:
     @staticmethod
     def __mypyrule():
         mypy   = ('${MYPY} ${SRC}  --ignore-missing-imports '
-                  +'--follow-imports=skip --fast-parser')
+                  +'--follow-imports=skip')
         for name in ('', 'linting', '..', '../linting'):
             path = Path(name)/'mypy.ini'
             if path.exists():
