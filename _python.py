@@ -176,7 +176,7 @@ def pymoduledependencies(pysrc, name = None):
     path = lambda x: _open(getattr(x, 'abspath', lambda: x)())
     for item in pysrc:
         with closing(path(item)) as stream:
-            for line in stream:
+            for line in stream: # pylint: disable=not-an-iterable
                 if 'import' not in line:
                     continue
 
@@ -206,6 +206,7 @@ def haspyext(csrc):
     pattern = re.compile(r'\s*#\s*include\s*["<]pybind11')
     for item in csrc:
         with closing(_open(item.abspath())) as stream:
+            # pylint: disable=not-an-iterable
             if any(pattern.match(line) is not None for line in stream):
                 return True
     return False
@@ -219,6 +220,9 @@ class Linting:
                   + '--msg-template="{path}:{line}:{column}:{C}: [{symbol}] {msg}" '
                   + '--disable=locally-disabled '
                   + '--reports=no')
+
+        if get_distribution("pylint").version >= '1.7.1':  # pylint: disable=no-member
+            pylint += ' --score=n'
 
         if (get_distribution("astroid").version == '1.4.8' # pylint: disable=no-member
                 or sys.platform.startswith("win")):
