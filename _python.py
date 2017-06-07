@@ -495,15 +495,17 @@ class CondaSetup:
         if res[name][1] not in ('defaults', ''):
             cmd += ' -c '+res[name][1]
 
-        if self.__run('install '+cmd+' --yes') and version is None:
-            return self.__condaupdate(res, name, None)
+        if self.__run('install '+cmd+' --yes'):
+            self.__run('remove -n %s %s --yes' % (self.envname, name))
+            return False
         return True
 
     def __condainstall(self, name, version):
         "installs a module with conda"
-        cmd = '-n '+self.envname+ ' ' + name
+        cmd = '-n '+self.envname+ ' "' + name
         if version is not None:
             cmd += ('=' if self.__ismin(name) else '>=') + str(version)
+        cmd += '"'
 
         for channel in CHANNELS:
             if not self.__run('install ' + cmd + channel+ ' --yes'):
@@ -589,7 +591,7 @@ class CondaSetup:
             elif self.__ismin(name):
                 cmd += ["%s==%s" % (name, version)]
             else:
-                cmd += ['-U', "%s>=%s" % (name, version)]
+                cmd += ["%s>=%s" % (name, version)]
             subprocess.check_call(cmd)
 
     def __coffee_run(self):
