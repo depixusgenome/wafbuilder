@@ -291,13 +291,19 @@ class Linting:
             return (nodes, [])
 
         rules = [cls.__encodingrule(bld)] # type: List
-        if ('python', 'pylint') in requirements:
-            rules.append(cls.__pylintrule())
-            rules[-1]['scan'] = _scan
-
         if ('python', 'mypy') in requirements:
             rules.append(cls.__mypyrule())
             rules[-1]['scan'] = _scan
+            rules[-1]['group'] = 'mypy'
+            if 'mypy' not in bld.group_names:
+                bld.add_group('mypy', move = False)
+
+        if ('python', 'pylint') in requirements:
+            rules.append(cls.__pylintrule())
+            rules[-1]['scan']  = _scan
+            rules[-1]['group'] = 'pylint'
+            if 'pylint' not in bld.group_names:
+                bld.add_group('pylint', move = False)
 
         def _build(item, kwargs):
             bld(source = [item],

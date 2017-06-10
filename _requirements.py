@@ -293,9 +293,10 @@ class RequirementManager:
                     _print(name, origs, '')
             print('', file = stream)
 
-    def reload(self, modules):
+    def reload(self, modules, clear = True):
         u"reloads the data"
-        self.clear()
+        if clear:
+            self.clear()
         _reload(modules)
 
 REQ = RequirementManager()
