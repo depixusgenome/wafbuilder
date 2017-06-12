@@ -27,6 +27,7 @@ def getlocals(glob = None, ind = 1) -> dict:
 
 INCORRECT = [str(Path(__file__).parent)]
 ROOT      = str(Path(__file__).parent.parent)
+DEFAULT   = None
 def appdir(iframe: int  = None) -> Path:
     "returns directory"
     if iframe is None:
@@ -38,8 +39,12 @@ def appdir(iframe: int  = None) -> Path:
                 continue
             break
         else:
-            raise AttributeError("Could not find appname frame")
+            if DEFAULT is None:
+                for frame in inspect.getouterframes(inspect.currentframe()):
+                    print(frame.filename)
+                raise AttributeError("Could not find appname frame")
 
+            fname = DEFAULT
     else:
         fname = inspect.getouterframes(inspect.currentframe())[iframe].filename
     return cast(Path, Path(fname).parent)
