@@ -188,8 +188,14 @@ def copytargets(bld:Context, arg, items):
     "yields source and targets for copied files"
     root = copyroot(bld, arg)
     for item in items:
-        tgt = item.abspath().replace('\\', '/')
-        tgt = tgt[tgt.rfind('/'+arg+'/')+2+len(arg):]
+        path = Path(str(item))
+        if arg  == '':
+            tgt = path.name
+        else:
+            parent = path.parent
+            while parent.name != arg:
+                parent = parent.parent
+            tgt = str(path.relative_to(parent))
         yield (item, root.make_node(tgt))
 
 def copyfiles(bld:Context, arg, items:Sequence):
@@ -203,7 +209,8 @@ def copyfiles(bld:Context, arg, items:Sequence):
     def _kword(_):
         return 'Copying'
 
-    copyroot(bld, arg).mkdir()
+    if arg != '':
+        copyroot(bld, arg).mkdir()
     for src, tgt in copytargets(bld, arg, items):
         bld(rule        = _cpy,
             name        = str(src)+':'+_kword(None).lower(),

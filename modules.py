@@ -15,10 +15,10 @@ def basecontext(bld):
 
 class Modules:
     "sets-up the modules"
-    def __init__(self, tests = "tests", src = "src", binit = True):
+    def __init__(self, singles = ("tests", "scripts"), src = "src", binit = True):
         if binit:
             wafbuilder.defaultwscript(src, "make(locals())")
-        self._all  = (() if tests is None else (tests,))
+        self._all  = () if singles is None else tuple(i for i in singles if Path(i).exists())
         if src is not None:
             self._all += tuple(wafbuilder.wscripted(src))
 
