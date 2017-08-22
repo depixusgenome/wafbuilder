@@ -22,9 +22,62 @@ class Modules:
         if src is not None:
             self._all += tuple(wafbuilder.wscripted(src))
 
-    def addbuild(self, locs):
+    def run_requirements(self, cnf):
+        "prints requirements"
+        from wafbuilder import requirements as _REQ
+        self(cnf)
+        _REQ.tostream()
+
+    def run_options(self, opt):
+        "create options"
+        # pylint: disable=no-member
+        wafbuilder.load(opt)
+        with self.options(opt):
+            wafbuilder.options(opt)
+
+    def run_configure(self, cnf):
+        "configure wafbuilder"
+        with self.configure(cnf):
+            wafbuilder.configure(cnf)
+
+    def run_tests(self, bld, root = 'tests'):
+        "runs pytests"
+        mods  = ('/'+i.split('/')[-1] for i in self(bld))
+        names = (path for path in bld.path.ant_glob((root+'/*test.py', root+'/*/*test.py')))
+        names = (str(name) for name in names if any(i in str(name) for i in mods))
+        wafbuilder.runtest(bld, *(name[name.rfind('tests'):] for name in names))
+
+    def run_build(self, bld, mods = None):
+        "compile sources"
+        if mods is None:
+            mods = self(bld)
+        bld.build_python_version_file()
+        wafbuilder.build(bld) # pylint: disable=no-member
+        bld.recurse(mods, 'build')
+
+    @classmethod
+    def make(cls, locs, simple = False):
+        "simple config"
+        cls().addbuild(locs, simple = simple)
+
+    def addbuild(self, locs, simple = False):
         "adds build methods"
         wafbuilder.addbuild(self._all, locs)
+        if not simple:
+            return
+
+        class _Requirements(basecontext('build/')):
+            fun = cmd = 'requirements'
+        class _Test(BuildContext):
+            fun = cmd = 'test'
+
+        locs.update(_Requirements = _Requirements,
+                    _Test         = _Test,
+                    requirements  = self.run_requirements,
+                    options       = self.run_options,
+                    configure     = self.run_configure,
+                    build         = self.run_build,
+                    test          = self.run_tests)
 
     def __call__(self, bld):
         "returns the required modules"

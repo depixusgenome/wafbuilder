@@ -27,7 +27,7 @@ def getlocals(glob = None, ind = 1) -> dict:
 
 INCORRECT = [str(Path(__file__).parent)]
 ROOT      = str(Path(__file__).parent.parent)
-DEFAULT   = None
+DEFAULT   = str(Path(__file__).parent.parent/"wscript")
 def appdir(iframe: int  = None) -> Path:
     "returns directory"
     if iframe is None:
