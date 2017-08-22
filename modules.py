@@ -53,6 +53,7 @@ class Modules:
             mods = self(bld)
         bld.build_python_version_file()
         wafbuilder.build(bld) # pylint: disable=no-member
+        wafbuilder.findpyext(bld, set(mod for mod in mods if mod != 'tests'))
         bld.recurse(mods, 'build')
 
     @classmethod

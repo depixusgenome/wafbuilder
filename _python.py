@@ -200,6 +200,9 @@ def pymoduledependencies(pysrc, name = None):
 
 def findpyext(bld:Context, items:Sequence):
     "returns a list of pyextension in that module"
+    if not _hascompiler(bld):
+        return
+
     names = list(items)
     bld.env.pyextmodules = set()
     for name in names:
