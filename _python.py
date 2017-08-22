@@ -55,17 +55,22 @@ print('unknown version' if vers is None else str(vers))
 
 IS_MAKE = YES
 
+def _hascompiler(cnf:Context):
+    return cnf.env.CC_NAME or cnf.env.CXX_NAME
+
 def _store(cnf:Context, flg:str):
-    for item in 'PYEXT', 'PYEMBED':
-        cnf.parse_flags(flg, uselib_store=item)
+    if _hascompiler(cnf):
+        for item in 'PYEXT', 'PYEMBED':
+            cnf.parse_flags(flg, uselib_store=item)
 
 @addconfigure
 def numpy(cnf:Context):
     "tests numpy and obtains its headers"
     # modules are checked by parsing REQUIRE
-    if ('python', 'numpy') not in requirements:
+    if ('python', 'numpy') not in requirements and _hascompiler(cnf):
         return
 
+    check_python(cnf, 'python', requirements.version('python', 'python'))
     cmd = cnf.env.PYTHON[0]                                     \
         + ' -c "from numpy.distutils import misc_util as n;'    \
         + ' print(\'-I\'.join([\'\']+n.get_numpy_include_dirs()))"'
@@ -90,7 +95,7 @@ class PyBind11(Make):
     _DONE = False
     @classmethod
     def configure(cls, cnf):
-        if cls._NAME not in requirements or cls._DONE:
+        if cls._NAME not in requirements or cls._DONE or not _hascompiler(cnf):
             return
         cls._DONE = True
 
@@ -132,7 +137,8 @@ def check_python(cnf, _, version):
     if 'PYTHON_VERSION' in cnf.env:
         return
     cnf.check_python_version(tuple(int(val) for val in str(version).split('.')))
-    cnf.check_python_headers()
+    if _hascompiler(cnf):
+        cnf.check_python_headers()
 
 @requirements.addcheck
 def check_python_default(cnf, name, version):
@@ -164,9 +170,9 @@ def check_python_nodejs(cnf, _, version):
     requirements.programversion(cnf, 'node', version)
 
 @runall
-def configure(_:Context):
+def configure(cnf:Context):
     "get python headers and modules"
-    pass
+    load(cnf)  # type: ignore # pylint: disable=undefined-variable
 
 def pymoduledependencies(pysrc, name = None):
     "detects dependencies"
