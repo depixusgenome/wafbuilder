@@ -61,24 +61,26 @@ class Modules:
         "simple config"
         cls().addbuild(locs, simple = simple)
 
-    def addbuild(self, locs, simple = False):
-        "adds build methods"
-        wafbuilder.addbuild(self._all, locs)
-        if not simple:
-            return
-
-        class _Requirements(basecontext('build/')):
+    def simple(self, cachepath = 'build/'):
+        "simple config"
+        class _Requirements(basecontext(cachepath)):
             fun = cmd = 'requirements'
         class _Test(BuildContext):
             fun = cmd = 'test'
 
-        locs.update(_Requirements = _Requirements,
+        return dict(_Requirements = _Requirements,
                     _Test         = _Test,
                     requirements  = self.run_requirements,
                     options       = self.run_options,
                     configure     = self.run_configure,
                     build         = self.run_build,
                     test          = self.run_tests)
+
+    def addbuild(self, locs, simple = False):
+        "adds build methods"
+        wafbuilder.addbuild(self._all, locs)
+        if simple:
+            locs.update(self.simple())
 
     def __call__(self, bld):
         "returns the required modules"
