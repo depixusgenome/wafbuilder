@@ -151,7 +151,7 @@ def addmissing(glob = None):
         "stacks loads from all basic items"
         global _REC # pylint: disable=global-statement
         _REC += 1
-        args = (getattr(cls, 'toload', lambda:'')(cnf) for cls in items)
+        args = (getattr(cls, 'toload', lambda _:'')(cnf) for cls in items)
         _REC -= 1
         return loading(cnf, args)
 
