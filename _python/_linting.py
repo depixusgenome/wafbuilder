@@ -31,6 +31,7 @@ def check_python_mypy(cnf, name, version):
 
 class Linting:
     "all rules for checking python"
+    INCLUDE_PYEXTS = False
     @staticmethod
     def __pylintrule():
         pylint = ('${PYLINT} ${SRC} '
@@ -99,11 +100,15 @@ class Linting:
         if len(items) == 0:
             return
 
-        pyext = set(bld.env.pyextmodules)
-        if any(i.get_name() == name+':pyext' for i in bld.get_all_task_gen()):
-            pyext.add(name)
+        if cls.INCLUDE_PYEXTS:
+            pyext = set(bld.env.pyextmodules)
+            if any(i.get_name() == name+':pyext' for i in bld.get_all_task_gen()):
+                pyext.add(name)
 
-        deps = list(pymoduledependencies(items, name) & pyext)
+            deps = list(pymoduledependencies(items, name) & pyext)
+        else:
+            deps = []
+
         def _scan(_):
             nodes = [bld.get_tgen_by_name(dep+':pyext').tasks[-1].outputs[0] for dep in deps]
             return (nodes, [])
