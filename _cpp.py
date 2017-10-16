@@ -53,14 +53,20 @@ class Flags(Make):
     def convertFlags(cnf:Context, cxx, islinks = False):
         u"Converts the flabs to msvc equivalents"
         if not _ismsvc(cnf):
-            return cxx
+            flags = {'/std=c++14': '-std:c++14',
+                     '/openmp':   '' if islinks else '-fopenmp',
+                     '/EHsc':         '',
+                    }
+            delim = '-', '/'
+        else:
+            flags = {'-std=c++14': '/std:c++14',
+                     '-fopenmp':   '' if islinks else '/openmp',
+                     '-g':         '',
+                    }
+            delim = "/", "-"
 
-        flags = {'-std=c++14': '/std:c++14',
-                 '-fopenmp':   '' if islinks else '/openmp',
-                 '-g':         '',
-                }
         cxx   = ' '.join(flags.get(i, i) for i in cxx.split(' '))
-        cxx   = cxx.replace('-', '/')
+        cxx   = cxx.replace(*delim)
         return cxx
 
     _DONE = False
