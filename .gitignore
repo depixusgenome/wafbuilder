@@ -4,6 +4,7 @@
 .*.un~
 *.*~
 .*.swp
+.mypy_cache
 build/
 wafbuilder/
 bin/waf3-*/

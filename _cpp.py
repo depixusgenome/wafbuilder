@@ -263,6 +263,9 @@ def build_cpp(bld:Context, name:str, version:str, **kwargs):
 @conf
 def cpp_compiler_name(cnf:Context):
     u"Returns the compiler version used"
+    if not (cnf.env.CC_NAME or cnf.env.CXX_NAME):
+        return None
+
     curr = cnf.env['CC_VERSION']
     if _ismsvc(cnf):
         curr = cnf.env['MSVC_VERSION']

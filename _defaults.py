@@ -39,8 +39,7 @@ def defaultwscript(path, code = 'make(locals())'):
         def _exists(self, *_, __old__ = Node.exists):
             if Path(self.abspath()) in _DEFAULT_WAFS:
                 return True
-            else:
-                return __old__(self)
+            return __old__(self)
         Node.exists = _exists
 
     path = Path.cwd()/path

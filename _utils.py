@@ -25,20 +25,26 @@ def getlocals(glob = None, ind = 1) -> dict:
         return inspect.stack()[ind+1][0].f_locals
     return glob
 
+INCORRECT = [str(Path(__file__).parent)]
+ROOT      = str(Path(__file__).parent.parent)
+DEFAULT   = str(Path(__file__).parent.parent/"wscript")
 def appdir(iframe: int  = None) -> Path:
     "returns directory"
     if iframe is None:
-        mymod  = str(Path(__file__).parent)
-        myroot = str(Path(__file__).parent.parent)
         for frame in inspect.getouterframes(inspect.currentframe()):
             fname = str(Path(frame.filename))
-            if fname.startswith('<') or mymod in fname or myroot not in fname:
+            if (fname.startswith('<')
+                    or any(i in fname for i in INCORRECT)
+                    or ROOT not in fname):
                 continue
             break
-            
         else:
-            raise AttributeError("Could not find appname frame")
+            if DEFAULT is None:
+                for frame in inspect.getouterframes(inspect.currentframe()):
+                    print(frame.filename)
+                raise AttributeError("Could not find appname frame")
 
+            fname = DEFAULT
     else:
         fname = inspect.getouterframes(inspect.currentframe())[iframe].filename
     return cast(Path, Path(fname).parent)
@@ -145,7 +151,7 @@ def addmissing(glob = None):
         "stacks loads from all basic items"
         global _REC # pylint: disable=global-statement
         _REC += 1
-        args = (getattr(cls, 'toload', lambda:'')(cnf) for cls in items)
+        args = (getattr(cls, 'toload', lambda _:'')(cnf) for cls in items)
         _REC -= 1
         return loading(cnf, args)
 
@@ -182,8 +188,14 @@ def copytargets(bld:Context, arg, items):
     "yields source and targets for copied files"
     root = copyroot(bld, arg)
     for item in items:
-        tgt = item.abspath().replace('\\', '/')
-        tgt = tgt[tgt.rfind('/'+arg+'/')+2+len(arg):]
+        path = Path(str(item))
+        if arg  == '':
+            tgt = path.name
+        else:
+            parent = path.parent
+            while parent.name != arg:
+                parent = parent.parent
+            tgt = str(path.relative_to(parent))
         yield (item, root.make_node(tgt))
 
 def copyfiles(bld:Context, arg, items:Sequence):
@@ -197,7 +209,8 @@ def copyfiles(bld:Context, arg, items:Sequence):
     def _kword(_):
         return 'Copying'
 
-    copyroot(bld, arg).mkdir()
+    if arg != '':
+        copyroot(bld, arg).mkdir()
     for src, tgt in copytargets(bld, arg, items):
         bld(rule        = _cpy,
             name        = str(src)+':'+_kword(None).lower(),
