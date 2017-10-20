@@ -57,13 +57,13 @@ class Flags(Make):
                      '/openmp':   '' if islinks else '-fopenmp',
                      '/EHsc':         '',
                     }
-            delim = '-', '/'
+            delim = "/", "-"
         else:
             flags = {'-std=c++14': '/std:c++14',
                      '-fopenmp':   '' if islinks else '/openmp',
                      '-g':         '',
                     }
-            delim = "/", "-"
+            delim = '-', '/'
 
         cxx   = ' '.join(flags.get(i, i) for i in cxx.split(' '))
         cxx   = cxx.replace(*delim)
