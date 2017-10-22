@@ -2,11 +2,8 @@
 namespace @nsname@ { void pymodule(pybind11::module &); }
 
 using namespace pybind11;
-PYBIND11_PLUGIN(@module@)
+PYBIND11_MODULE(@module@, m)
 {
-     module m("@module@");
      m.attr("__version__") = cast("@version@");
      @nsname@::pymodule(m);
-
-     return m.ptr();
 }

@@ -48,11 +48,9 @@ class PyBind11(Make):
                           int add(int i, int j) { return i + j; }
                           using namespace pybind11;
 
-                          PYBIND11_PLUGIN(example)
+                          PYBIND11_MODULE(example, m)
                           {
-                                module m("example", "pybind11 example");
                                 m.def("add", &add, "A function which adds two numbers");
-                                return m.ptr();
                           }
                           """, 'w')
             bld.shlib(features='pyext cxxshlib',
