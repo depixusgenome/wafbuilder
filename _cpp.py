@@ -202,7 +202,7 @@ def check_cpp_default(cnf:Context, name:str, version:Optional[str]):
         else:
             inc  = cnf.env.INCLUDES_PYEXT[0]
             lib  = cnf.env.LIBPATH_PYEXT[0]
-        line = ' -I'   + inc + ' -L' + lib + ' -l' + base
+        line = f' -I{inc} -I{Path(inc).parent} -L{lib} -l{base}'
         if not sys.platform.startswith('win'):
             line += ' -lm'
         libs = tuple(pre+base+suf for pre in ('', 'lib') for suf in ('.so', '.dll', '.lib'))
