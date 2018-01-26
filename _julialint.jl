@@ -16,9 +16,6 @@ function lintone(fname::AbstractString, str::AbstractString, doprint::Bool)
             resp = true
         end
     end
-    if resp && doprint
-        error("Found errors in $fname")
-    end
 end
 
 uselint = false
