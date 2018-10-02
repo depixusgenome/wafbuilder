@@ -48,9 +48,9 @@ class Flags(Make):
 
         copt = opt.add_option_group(CXX_OPTION_GROUP)
         if sys.platform.startswith('win'):
-            cxxflags = '/std:c++14 /EHsc'
+            cxxflags = '/std:c++17 /EHsc'
         else:
-            cxxflags = '-std=c++14 -g'
+            cxxflags = '-std=c++17 -g'
 
         copt.add_option('--cxxflags',
                         dest    = 'cxxflaglist',
