@@ -1,25 +1,26 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-u"Dealing with requirements"
+"Dealing with requirements"
 import re
 from collections        import OrderedDict
 from distutils.version  import LooseVersion
 from copy               import deepcopy
-from typing             import (Dict, Set, Callable, # pylint: disable=unused-import
-                                Optional, Tuple, Iterable)
+from typing             import Dict, List, Callable,  Optional, Tuple, Iterable
 from waflib.Context     import Context
 from ._defaults         import reload as _reload
 from ._utils            import appname
 
+Checks       = Dict[str,Dict[str,Callable]]
+Requirements = Dict[str,Dict[str,Tuple[Optional[str],bool]]]
 class RequirementManager:
-    u"Deals with requirements"
+    "Deals with requirements"
     def __init__(self):
-        self._checks = OrderedDict() # Dict[str,Dict[str,Callable]]
-        self._reqs   = OrderedDict() # Dict[str,Dict[str,Tuple[Optional[str,bool]]]]
-        self._done   = False
+        self._checks: Checks       = OrderedDict()
+        self._reqs:   Requirements = OrderedDict()
+        self._done                 = False
 
     def addcheck(self, fcn = None, lang = None, name = None):
-        u"adds a means for checking an item"
+        "adds a means for checking an item"
         def _wrapper(item, lang = lang, name = name):
             self._done = False
             fname      = item.__name__
@@ -89,7 +90,7 @@ class RequirementManager:
             return max(i[0] for i in origs.values())
 
     def require(self, lang = None, name = None, version = None, rtime = True, **kwa):
-        u"adds a requirement"
+        "adds a requirement"
         self._done = False
         if isinstance(lang, str):
             lang = str(lang).lower().replace('cxx', 'cpp')
@@ -127,7 +128,7 @@ class RequirementManager:
             self._reqfromlangdict(lang, rtime, kwa)
 
     def check(self, cnf):
-        u"checks whether the requirements are met"
+        "checks whether the requirements are met"
         if self._done:
             return
         self._done = True
@@ -152,42 +153,39 @@ class RequirementManager:
                     _get(lang, name)
 
     def clear(self):
-        u"removes all requirements"
+        "removes all requirements"
         self._reqs.clear()
 
     def buildonly(self, lang = None):
-        u"returns build only dependencies"
+        "returns build only dependencies"
         if lang is None:
             return {lang: self.buildonly(lang) for lang in self._reqs}
-        else:
-            return {name: self.__version(origs)
-                    for name, origs in self._reqs[lang].items()
-                    if not any(isrt for _1, isrt, _2 in origs.values())}
+        return {name: self.__version(origs)
+                for name, origs in self._reqs[lang].items()
+                if not any(isrt for _1, isrt, _2 in origs.values())}
 
     def runtime(self, lang = None):
-        u"returns build and runtime dependencies"
+        "returns build and runtime dependencies"
         if lang is None:
             return {lang: self.runtime(lang) for lang in self._reqs}
-        else:
-            return {name: self.__version(origs)
-                    for name, origs in self._reqs[lang].items()
-                    if any(isrt for _1, isrt, _2 in origs.values())}
+        return {name: self.__version(origs)
+                for name, origs in self._reqs[lang].items()
+                if any(isrt for _1, isrt, _2 in origs.values())}
 
     def __call__(self, lang = None, name = None, runtimeonly = False):
-        u"returns build and runtime dependencies"
+        "returns build and runtime dependencies"
         if runtimeonly and name is None:
             return self.runtime(lang)
-        elif lang is None:
+        if lang is None:
             assert name is None
             return {lang: self(lang) for lang in self._reqs}
-        elif name is None:
+        if name is None:
             return {name: self.__version(origs)
                     for name, origs in self._reqs[lang].items()}
-        else:
-            return self.__version(self._reqs[lang][name])
+        return self.__version(self._reqs[lang][name])
 
     def version(self, lang, name = None, allorigs = False):
-        u"returns the version of a package"
+        "returns the version of a package"
         if name is None:
             if lang is None:
                 return deepcopy(self._reqs)
@@ -195,46 +193,43 @@ class RequirementManager:
             val = self._reqs.get(lang, None)
             if val is None:
                 return None
-            ret = OrderedDict()
-            for name, origs in val.items():
-                ret[name] = OrderedDict((i, j[:2]) for i, j in origs.items())
+            ret: Requirements = OrderedDict()
+            for k, origs in val.items():
+                ret[k] = OrderedDict((i, j[:2]) for i, j in origs.items())
             return ret
-        else:
-            origs = self._reqs.get(lang, {}).get(name, None)
-            if origs is None:
-                return None
-            elif allorigs:
-                return {i:j[:2] for i, j in origs.items()}
-            else:
-                return self.__version(origs)
+        origs = self._reqs.get(lang, {}).get(name, None)
+        if origs is None:
+            return None
+        if allorigs:
+            return {i:j[:2] for i, j in origs.items()}
+        return self.__version(origs)
 
     def pinned(self, lang = None, name = None):
-        u"returns pinned packages"
+        "returns pinned packages"
         if name is None:
             if lang is None:
-                ret = []
-                for name in self._reqs:
-                    ret.extend(self.pinned(name))
+                ret: List = []
+                for i in self._reqs:
+                    ret.extend(self.pinned(i))
                 return ret
 
             val = self._reqs.get(lang, None)
             if val is None:
                 return []
-            return [name for name, origs in val.items() if self.__pinned(origs)]
-        else:
-            origs = self._reqs.get(lang, {}).get(name, None)
-            return origs is not None and self.__pinned(origs)
+            return [i for i, origs in val.items() if self.__pinned(origs)]
+        origs = self._reqs.get(lang, {}).get(name, None)
+        return origs is not None and self.__pinned(origs)
 
     def __contains__(self, args):
         if isinstance(args, str):
             return (args in self._reqs
                     or any(re.match(args, name) for name in self._reqs))
-        elif args[0] not in self._reqs:
+        if args[0] not in self._reqs:
             return False
-        else:
-            mods = self._reqs[args[0]]
-            return (args[1] in mods
-                    or any(re.match(args[1], name) for name in mods))
+
+        mods = self._reqs[args[0]]
+        return (args[1] in mods
+                or any(re.match(args[1], name) for name in mods))
 
     @staticmethod
     def programversion(cnf   :Context,
@@ -242,7 +237,7 @@ class RequirementManager:
                        minver:LooseVersion,
                        reg       = None,
                        mandatory = True):
-        u"check version of a program"
+        "check version of a program"
         if reg is None:
             areg = name
         else:
@@ -276,7 +271,7 @@ class RequirementManager:
         return True
 
     def tostream(self, stream = None):
-        u"prints requirements"
+        "prints requirements"
         def _print(name, origs, tpe):
             vers = str(self.__version(origs))
             if self.__pinned(origs):
@@ -294,7 +289,7 @@ class RequirementManager:
             print('', file = stream)
 
     def reload(self, modules, clear = True):
-        u"reloads the data"
+        "reloads the data"
         if clear:
             self.clear()
         _reload(modules)
