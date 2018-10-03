@@ -33,9 +33,10 @@ def appdir(iframe: int  = None) -> Path:
     if iframe is None:
         for frame in inspect.getouterframes(inspect.currentframe()):
             fname = str(Path(frame.filename))
-            if (fname.startswith('<')
-                    or any(i in fname for i in INCORRECT)
-                    or ROOT not in fname):
+            if fname.startswith('<'):
+                continue
+            if (fname.startswith("/")
+                    and(any(i in fname for i in INCORRECT) or ROOT not in fname)):
                 continue
             break
         else:
@@ -47,13 +48,15 @@ def appdir(iframe: int  = None) -> Path:
             fname = DEFAULT
     else:
         fname = inspect.getouterframes(inspect.currentframe())[iframe].filename
+    if not fname.startswith("/"):
+        return cast(Path, Path(ROOT)/fname)
     return cast(Path, Path(fname).parent)
 
 def appname(iframe: int  = None) -> str:
     "returns directory"
     return appdir(iframe).stem
 
-class Make(object):
+class Make:
     "base class for a given functionnality"
     IS_MAKE = YES
 
