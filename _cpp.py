@@ -26,8 +26,8 @@ WARNINGS         = {Ellipsis: ['-Werror=implicit-function-declaration',
                                '-Wmissing-include-dirs', '-Wparentheses',
                                '-Wsequence-point'],
                     'msvc':   ['/W3']}
-FLAGS           = {'/std=c++14': '-std:c++14',
-                   '/std=c++17': '-std:c++17',
+FLAGS           = {'/std:c++14': '-std=c++14',
+                   '/std:c++17': '-std=c++17',
                    '/openmp':    '-fopenmp',
                    '/EHsc':      '',
                   }
@@ -48,7 +48,7 @@ class Flags(Make):
 
         copt = opt.add_option_group(CXX_OPTION_GROUP)
         if sys.platform.startswith('win'):
-            cxxflags = '/std:c++17 /EHsc'
+            cxxflags = '/std:c++14 /EHsc'
         else:
             cxxflags = '-std=c++17 -g'
 
@@ -131,6 +131,8 @@ class Boost(Make):
         libs, vers = cls._getlibs()
         if len(libs):
             cnf.check_boost(lib = ' '.join(libs-set(cls._H_ONLY)), mandatory = True)
+            if sys.platform.startswith("win32"):
+                cnf.env['LIB_BOOST']= [i.replace("-sgd-", "-gd-") for i in cnf.env["LIB_BOOST"]]
             if LooseVersion(cnf.env.BOOST_VERSION.replace('_', '.')) < vers:
                 cnf.fatal('Boost version is too old: %s < %s'
                           % (str(vers), str(cnf.env.BOOST_VERSION)))
@@ -188,12 +190,11 @@ def check_cpp_default(cnf:Context, name:str, version:Optional[str]):
             root    = (Path(cnf.env.INCLUDES_PYEXT[0])/'..'/'Library').resolve()
             inc     = str((root/'include').resolve())
             lib     = str((root/'lib').resolve())
-            libflag = ''
         else:
             inc      = cnf.env.INCLUDES_PYEXT[0]
             lib      = cnf.env.LIBPATH_PYEXT[0] if len(cnf.env.LIBPATH_PYEXT) else ""
-            libflag  = "-L" if len(lib) else ""
 
+        libflag  = "-L" if len(lib) else ""
         line = f' -I{inc} -I{Path(inc).parent} {libflag}{lib} -l{base}'
         if not sys.platform.startswith('win'):
             line += ' -lm'

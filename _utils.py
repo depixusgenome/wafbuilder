@@ -35,7 +35,7 @@ def appdir(iframe: int  = None) -> Path:
             fname = str(Path(frame.filename))
             if fname.startswith('<'):
                 continue
-            if (fname.startswith("/")
+            if ((fname.startswith("/") or fname[1:3] == ':\\')
                     and(any(i in fname for i in INCORRECT) or ROOT not in fname)):
                 continue
             break
@@ -48,7 +48,7 @@ def appdir(iframe: int  = None) -> Path:
             fname = DEFAULT
     else:
         fname = inspect.getouterframes(inspect.currentframe())[iframe].filename
-    if not fname.startswith("/"):
+    if not (fname.startswith("/") or fname[1:3] == ':\\'):
         return cast(Path, Path(ROOT)/fname)
     return cast(Path, Path(fname).parent)
 
