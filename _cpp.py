@@ -17,6 +17,20 @@ from ._requirements     import REQ as requirements
 IS_MAKE          = YES
 CXX_OPTION_GROUP = 'C++ Options'
 COMPILERS        = 'g++', 'clang++', 'msvc'
+WARNINGS         = {Ellipsis: ['-Werror=implicit-function-declaration',
+                               '-W', '-Wall', '-Wextra','-Wno-write-strings',
+                               '-Wunused', '-Wuninitialized', '-fno-common',
+                               '-Winit-self', '-Wpacked', '-Wpointer-arith',
+                               '-Wmissing-format-attribute', '-Wmissing-noreturn',
+                               '-Wswitch-enum', '-Wundef', '-Wunreachable-code',
+                               '-Wmissing-include-dirs', '-Wparentheses',
+                               '-Wsequence-point'],
+                    'msvc':   ['/W3']}
+FLAGS           = {'/std=c++14': '-std:c++14',
+                   '/std=c++17': '-std:c++17',
+                   '/openmp':    '-fopenmp',
+                   '/EHsc':      '',
+                  }
 
 def _ismsvc(cnf:Context):
     return cnf.env['COMPILER_CXX'] == 'msvc'
@@ -34,15 +48,15 @@ class Flags(Make):
 
         copt = opt.add_option_group(CXX_OPTION_GROUP)
         if sys.platform.startswith('win'):
-            cxxflags = '/std:c++14 /EHsc'
+            cxxflags = '/std:c++17 /EHsc'
         else:
-            cxxflags = '-std=c++14 -g'
+            cxxflags = '-std=c++17 -g'
 
         copt.add_option('--cxxflags',
                         dest    = 'cxxflaglist',
                         default = cxxflags,
                         action  = 'store',
-                        help    = 'define cxx flags')
+                        help    = f'define cxx flags (defaults are {cxxflags})')
         copt.add_option('--linkflags',
                         dest    = 'linkflaglist',
                         default = '',
@@ -52,18 +66,10 @@ class Flags(Make):
     @staticmethod
     def convertFlags(cnf:Context, cxx, islinks = False):
         u"Converts the flabs to msvc equivalents"
-        if not _ismsvc(cnf):
-            flags = {'/std=c++14': '-std:c++14',
-                     '/openmp':   '' if islinks else '-fopenmp',
-                     '/EHsc':         '',
-                    }
-            delim = "/", "-"
-        else:
-            flags = {'-std=c++14': '/std:c++14',
-                     '-fopenmp':   '' if islinks else '/openmp',
-                     '-g':         '',
-                    }
-            delim = '-', '/'
+        flags = {j: i for i, j in FLAGS.items()} if _ismsvc(cnf) else dict(FLAGS)
+        delim =  ('-', '/')                      if _ismsvc(cnf) else ("/", "-")
+        if islinks:
+            flags[next(i for i in flags if i.endswith('openmp'))] = ''
 
         cxx   = ' '.join(flags.get(i, i) for i in cxx.split(' '))
         cxx   = cxx.replace(*delim)
@@ -77,26 +83,9 @@ class Flags(Make):
             return
         cls._DONE = True
 
-        warnings = [
-            '-Werror=implicit-function-declaration',
-            '-W', '-Wall', '-Wextra','-Wno-write-strings', '-Wunused',
-            '-Wuninitialized',
-            '-fno-common', '-Winit-self', '-Wpacked',
-            '-Wpointer-arith', '-Wmissing-format-attribute',
-            '-Wmissing-noreturn',
-            '-Wswitch-enum', '-Wundef',
-            '-Wunreachable-code',
-            '-Wmissing-include-dirs',
-            '-Wparentheses',
-            '-Wsequence-point',
-            ]
-        if _ismsvc(cnf):
-            warnings = ['/W3']
-
-        cxx   = cnf.options.cxxflaglist + ' ' + ' '.join(warnings)
-
+        warns = WARNINGS.get(cnf.env['COMPILER_CXX'], WARNINGS[...])
+        cxx   = cnf.options.cxxflaglist + ' ' + ' '.join(warns)
         links = cnf.options.linkflaglist
-
         cxx   = cls.convertFlags(cnf, cxx)
         links = cls.convertFlags(cnf, links)
 
@@ -108,7 +97,7 @@ class Flags(Make):
         cnf.env.append_unique('CXXFLAGS',  Utils.to_list(cxx))
         cnf.env.append_unique('LINKFLAGS', Utils.to_list(links))
         cnf.env.append_unique('INCLUDES',  ['../'])
-        cnf.env.append_unique('CXXFLAGS', warnings)
+        cnf.env.append_unique('CXXFLAGS', warns)
 
 class Boost(Make):
     u"deal with cxx/ld flags"
@@ -196,13 +185,16 @@ def check_cpp_default(cnf:Context, name:str, version:Optional[str]):
         cnf.check_python_module(base, condition = cond)
 
         if sys.platform.startswith('win'):
-            root = (Path(cnf.env.INCLUDES_PYEXT[0])/'..'/'Library').resolve()
-            inc  = str((root/'include').resolve())
-            lib  = str((root/'lib').resolve())
+            root    = (Path(cnf.env.INCLUDES_PYEXT[0])/'..'/'Library').resolve()
+            inc     = str((root/'include').resolve())
+            lib     = str((root/'lib').resolve())
+            libflag = ''
         else:
-            inc  = cnf.env.INCLUDES_PYEXT[0]
-            lib  = cnf.env.LIBPATH_PYEXT[0]
-        line = ' -I'   + inc + ' -L' + lib + ' -l' + base
+            inc      = cnf.env.INCLUDES_PYEXT[0]
+            lib      = cnf.env.LIBPATH_PYEXT[0] if len(cnf.env.LIBPATH_PYEXT) else ""
+            libflag  = "-L" if len(lib) else ""
+
+        line = f' -I{inc} -I{Path(inc).parent} {libflag}{lib} -l{base}'
         if not sys.platform.startswith('win'):
             line += ' -lm'
         libs = tuple(pre+base+suf for pre in ('', 'lib') for suf in ('.so', '.dll', '.lib'))

@@ -99,7 +99,7 @@ def findpyext(bld:Context, items:Sequence):
 
 def haspyext(csrc):
     "detects whether pybind11 is used"
-    pattern = re.compile(r'\s*#\s*include\s*["<]pybind11')
+    pattern = re.compile(r'\s*#\s*include\s*["<].*pybind11')
     for item in csrc:
         with closing(_open(item.abspath())) as stream:
             # pylint: disable=not-an-iterable

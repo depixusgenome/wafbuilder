@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 "All *basic* python related details"
 import sys
+import re
 from pathlib          import Path
 from typing           import Sequence, List  # pylint: disable=unused-import
 from pkg_resources    import get_distribution
@@ -37,7 +38,7 @@ class Linting:
         pylint = ('${PYLINT} ${SRC} '
                   + '--init-hook="sys.path.append(\'./\')" '
                   + '--msg-template="{path}:{line}:{column}:{C}: [{symbol}] {msg}" '
-                  + '--disable=locally-disabled '
+                  + '--disable=locally-disabled,fixme '
                   + '--reports=no')
 
         if get_distribution("pylint").version >= '1.7.1':  # pylint: disable=no-member
@@ -72,10 +73,12 @@ class Linting:
 
     @staticmethod
     def __encodingrule(bld):
+        fixme = re.compile(r".*#\s*(FIXME|TODO|DEBUG).*")
         def _checkencoding(tsk):
             headers = '#!/usr/bin/env python3\n', '# -*- coding: utf-8 -*-\n'
+            abspath = tsk.inputs[0].abspath()
 
-            with _open(tsk.inputs[0].abspath()) as stream:
+            with _open(abspath) as stream:
                 errs    = [True]*2
                 try:
                     for i, head in enumerate(headers):
@@ -88,7 +91,13 @@ class Linting:
             tpl = 'Missing or incorrect header line %d: '
             msg = '\t- '.join((tpl % i + headers[i])  for i in range(len(errs)) if errs[i])
             if len(msg):
-                bld.fatal('In file %s:\n\t- ' % tsk.inputs[0].abspath()+msg)
+                bld.fatal(f'In file {abspath}:\n\t- {msg}')
+
+            with _open(tsk.inputs[0].abspath()) as stream:
+                for i, line in enumerate(stream):
+                    match = fixme.match(line)
+                    if match:
+                        bld.to_log(f'\n{abspath}|{i} col 1 warning| [{match.group(1)}]\n`')
 
         return dict(color       = 'CYAN',
                     rule        = _checkencoding,
