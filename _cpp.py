@@ -104,7 +104,7 @@ class Boost(Make):
     _H_ONLY = 'accumulators',
 
     @staticmethod
-    def _getlibs():
+    def getlibs():
         names = set()
         curr  = LooseVersion('0.0')
         req   = requirements.version('cpp', allorigs = False)
@@ -123,19 +123,41 @@ class Boost(Make):
     @classmethod
     def toload(cls, _:Context):
         u"returns boost feature if required"
-        return 'boost' if len(cls._getlibs()[0]) else ''
+        return 'boost' if len(cls.getlibs()[0]) else ''
 
     @classmethod
     def configure(cls, cnf:Context):
         u"setup configure"
-        libs, vers = cls._getlibs()
-        if len(libs):
-            cnf.check_boost(lib = ' '.join(libs-set(cls._H_ONLY)), mandatory = True)
-            if sys.platform.startswith("win32"):
-                cnf.env['LIB_BOOST']= [i.replace("-sgd-", "-gd-") for i in cnf.env["LIB_BOOST"]]
-            if LooseVersion(cnf.env.BOOST_VERSION.replace('_', '.')) < vers:
-                cnf.fatal('Boost version is too old: %s < %s'
-                          % (str(vers), str(cnf.env.BOOST_VERSION)))
+        libs, vers = cls.getlibs()
+        if not len(libs):
+            return
+
+        if not cnf.options.boost_includes and not cnf.options.boost_libs:
+            path = Path(cnf.env["PYTHON"][0]).parent
+            for i in range(3):
+                if (path/"include"/"boost").exists() and (path/"lib").exists():
+                    cnf.options.boost_includes = str(path/"include")
+                    cnf.options.boost_libs     = str(path/"lib")
+                    break
+                path = path.parent
+
+        cnf.check_boost(lib = ' '.join(libs-set(cls._H_ONLY)), mandatory = True)
+        if sys.platform.startswith("win32"):
+            cnf.env['LIB_BOOST']= [i.replace("-sgd-", "-gd-") for i in cnf.env["LIB_BOOST"]]
+        else:
+            path = Path(cnf.env["LIBPATH_BOOST"][0])
+            good = []
+            for i in cnf.env["LIB_BOOST"]:
+                if (path/f"lib{i}").exists():
+                    good.append(i)
+                elif (path/f"lib{i[:i.find('.so')+3]}").exists():
+                    good.append(i[:i.find('.so')])
+                else:
+                    raise KeyError(f"missing $path/lib$i")
+            cnf.env["LIB_BOOST"] = good
+        if LooseVersion(cnf.env.BOOST_VERSION.replace('_', '.')) < vers:
+            cnf.fatal('Boost version is too old: %s < %s'
+                      % (str(vers), str(cnf.env.BOOST_VERSION)))
 
 def toload(cnf:Context):
     u"returns all features needed by cpp"

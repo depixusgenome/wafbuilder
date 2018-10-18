@@ -15,6 +15,7 @@ from   distutils.version    import LooseVersion
 from waflib                 import Logs
 from waflib.Context         import Context
 from .._requirements        import REQ as requirements
+from .._cpp                 import Boost
 
 CHANNELS = ['', ' -c conda-forge']
 
@@ -198,6 +199,11 @@ class CondaSetup:
         itms.update((i[len('python_'):], j)
                     for i, j in requirements('cpp', runtimeonly = self.rtime).items()
                     if i.startswith('python_'))
+
+        boost = Boost.getlibs()
+        if boost:
+            itms["boost"] = boost[-1]
+
         if len(self.packages):
             itms = {i: j for i, j in itms.items() if i in self.packages}
 
