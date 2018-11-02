@@ -21,11 +21,13 @@ def version(path = None) -> str:
         if len(commit.strip()):
             cmd   += '--', commit.strip()
     else:
-        cmd   +=  '--dirty=+',
+        cmd   +=  ('--dirty=+',)
     return _cmd(*cmd)
 
-def lasthash() -> str:
+def lasthash(path = None) -> str:
     u"returns last commit hashtag"
+    if path is not None:
+        return _cmd('log', '--format=%h', '-1', '--', str(path))
     return _cmd('log', '-n', '1', '--pretty=format:%H')
 
 def lastdate() -> str:
