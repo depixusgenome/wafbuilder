@@ -5,11 +5,12 @@ import inspect
 import shutil
 from   pathlib      import Path
 from typing         import (Iterator, Callable, # pylint: disable=unused-import
-                            Iterable, Union, Sequence, Dict, Set, Any, cast)
+                            Iterable, Union, Sequence, Dict, Set, Any, cast, List)
 from types          import ModuleType, FunctionType
 from functools      import wraps
 
 from waflib.Context import Context
+from .git           import lasthash as _gitversion
 
 YES = type('YES', (object,), dict(__doc__ = "Used as a typed enum"))()
 
@@ -201,21 +202,25 @@ def copytargets(bld:Context, arg, items):
             tgt = str(path.relative_to(parent))
         yield (item, root.make_node(tgt))
 
+FILTERS : List[Callable] = []
+def copytask(tsk):
+    "copies a task, changing css tags when it finds any"
+    if not any(act(tsk) for act in FILTERS):
+        shutil.copy2(tsk.inputs[0].abspath(),
+                     tsk.outputs[0].abspath())
+
 def copyfiles(bld:Context, arg, items:Sequence):
     "copy py modules to build root path"
     if len(items) == 0:
         return
 
-    def _cpy(tsk):
-        shutil.copy2(tsk.inputs[0].abspath(),
-                     tsk.outputs[0].abspath())
     def _kword(_):
         return 'Copying'
 
     if arg != '':
         copyroot(bld, arg).mkdir()
     for src, tgt in copytargets(bld, arg, items):
-        bld(rule        = _cpy,
+        bld(rule        = copytask,
             name        = str(src)+':'+_kword(None).lower(),
             source      = [src],
             target      = [tgt],
