@@ -30,6 +30,12 @@ def lasthash(path = None) -> str:
         return _cmd('log', '--format=%h', '-1', '--', str(path))
     return _cmd('log', '-n', '1', '--pretty=format:%H')
 
+def lasttimestamp(path = None) -> str:
+    u"returns last commit timestamp"
+    if path is not None:
+        return _cmd('log', '--format=%at', '-1', '--', str(path))
+    return _cmd('log', '-n', '1', '--pretty=format:%at')
+
 def lastdate() -> str:
     u"returns last commit date"
     return _cmd('log', '-n', '1', '--pretty=format:%cD')

@@ -15,7 +15,7 @@ from ._requirements import REQ as requirements
 from ._utils        import (addmissing, appname, appdir, copyfiles,
                             runall, patch, getlocals, copyroot, FILTERS)
 from ._python       import checkpy, findpyext, condaenv, runtest, condasetup, CHANNELS
-from .git           import version, lasthash, lastdate, isdirty
+from .git           import version, lasthash, lastdate, isdirty, lasttimestamp
 
 def top()-> str:
     u"returns top path"
@@ -155,6 +155,7 @@ def build_python_version_file(bld:Context):
         lasthash = lasthash(),
         lastdate = lastdate(),
         isdirty  = isdirty(),
+        timestamp= lasttimestamp(),
         cpp_compiler_name = bld.cpp_compiler_name())
 
 addmissing(locals())
