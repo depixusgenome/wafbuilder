@@ -166,7 +166,7 @@ def toload(cnf:Context):
 
     load = 'compiler_cxx'
     if sys.platform == "win32":
-        load += ' msvc'
+        load += ' msvc msvs'
 
     if ('cpp', 'python_.*') in requirements:
         load += ' python'

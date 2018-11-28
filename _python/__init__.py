@@ -5,5 +5,6 @@ from ._conda    import condasetup, condaenv, CHANNELS
 from ._pybind11 import findpyext
 from ._linting  import checkpy
 from ._pytest   import runtest
+from ._jupyter  import _
 from ._script   import (IS_MAKE,  # pylint: disable=no-name-in-module
                         options, configure, load, build, toload)
