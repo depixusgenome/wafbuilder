@@ -134,6 +134,9 @@ class Boost(Make):
 
         if not cnf.options.boost_includes and not cnf.options.boost_libs:
             path = Path(cnf.env["PYTHON"][0]).parent
+            if sys.platform.startswith("win32"):
+                path /= "Library"
+
             for i in range(3):
                 if (path/"include"/"boost").exists() and (path/"lib").exists():
                     cnf.options.boost_includes = str(path/"include")
