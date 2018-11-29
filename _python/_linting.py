@@ -35,10 +35,11 @@ class Linting:
     INCLUDE_PYEXTS = False
     @staticmethod
     def __pylintrule():
+        crlf   = '' if sys.platform == 'linux' else ',unexpected-line-ending-format'
         pylint = ('${PYLINT} ${SRC} '
                   + '--init-hook="sys.path.append(\'./\')" '
                   + '--msg-template="{path}:{line}:{column}:{C}: [{symbol}] {msg}" '
-                  + '--disable=locally-disabled,fixme '
+                  + '--disable=locally-disabled,fixme%s ' % crlf
                   + '--reports=no')
 
         if get_distribution("pylint").version >= '1.7.1':  # pylint: disable=no-member
