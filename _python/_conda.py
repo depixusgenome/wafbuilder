@@ -105,7 +105,8 @@ class CondaSetup:
         "create conda environment"
         if self.__run('list -n '+ self.envname):
             version = requirements('python', 'numpy')
-            cmd =  'create --yes -n '+self.envname  + " numpy>="+str(version)
+            pyvers  = '.'.join(str(requirements('python', 'python')).split('.')[:2])
+            cmd     = f'create --yes -n {self.envname} python={pyvers} numpy>={version}'
             if self.__ismin('numpy'):
                 cmd = cmd.replace('>=', '=')
 
