@@ -37,10 +37,9 @@ class Linting:
     def __pylintrule():
         crlf   = '' if sys.platform == 'linux' else ',unexpected-line-ending-format'
         pylint = ('${PYLINT} ${SRC} '
-                  + '--init-hook="sys.path.extend((\'./\', \'../wafbuilder/_python\'))" '
+                  + '--init-hook="sys.path.append(\'./\')" '
                   + '--msg-template="{path}:{line}:{column}:{C}: [{symbol}] {msg}" '
                   + '--disable=locally-disabled,fixme%s ' % crlf
-                  + '--load-plugins=_pylint_plugin '
                   + '--reports=no')
 
         if get_distribution("pylint").version >= '1.7.1':  # pylint: disable=no-member
