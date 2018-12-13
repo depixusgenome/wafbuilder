@@ -21,7 +21,7 @@ CHANNELS = ['', ' -c conda-forge']
 
 class CondaSetup:
     "installs / updates a conda environment"
-    def __init__(self, cnf = None, **kwa):
+    def __init__(self, cnf = None, conda = 'conda', **kwa):
         self.envname = kwa.get('envname',     getattr(cnf, 'condaenv',   'root'))
         self.packages = kwa.get('packages', getattr(cnf, 'packages', '').split(','))
         if self.packages == ['']:
@@ -37,6 +37,12 @@ class CondaSetup:
         else:
             lst = [i.strip().lower() for i in getattr(cnf, 'pinned', '').split(',')]
         self.pinned  = kwa.get('pinned',  lst)
+        self._conda  = conda
+
+    @staticmethod
+    def configure(cnf:Context):
+        "get conda script"
+        cnf.find_program("conda", var="CONDA", mandatory=True)
 
     @staticmethod
     def options(opt:Context):
@@ -72,20 +78,17 @@ class CondaSetup:
                        default = '',
                        help    = u"consider only these packages")
 
-    @staticmethod
-    def __run(cmd):
+    def __run(self, cmd):
         try:
-            Logs.info('conda '+cmd)
-            subprocess.check_call(['conda']+cmd.split(' '),
+            subprocess.check_call(self._conda+cmd.split(' '),
                                   stdout=subprocess.DEVNULL,
                                   stderr=subprocess.DEVNULL)
         except: # pylint: disable=bare-except
             return True
         return False
 
-    @staticmethod
-    def __read(cmd):
-        return subprocess.check_output(['conda']+cmd.split(' '),
+    def __read(self, cmd):
+        return subprocess.check_output(self._conda+cmd.split(' '),
                                        stderr=subprocess.DEVNULL)
 
     @classmethod
@@ -325,7 +328,7 @@ class CondaSetup:
 
 def condasetup(cnf:Context = None, **kwa):
     "installs / updates a conda environment"
-    cset = CondaSetup(cnf.options, **kwa)
+    cset = CondaSetup(cnf.options, conda = cnf.env['CONDA'], **kwa)
     if cset.copy is None:
         cset.run()
     else:
