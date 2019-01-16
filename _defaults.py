@@ -11,6 +11,8 @@ _DEFAULT_WAFS = {} # type: Dict[Path, str]
 
 def wscripted(path) -> Sequence[str]:
     u"return subdirs with wscript in them"
+    if isinstance(path, (tuple, list, set, frozenset)):
+        return sum((wscripted(i) for i in path), [])
     orig = path
     path = Path.cwd() / path
     return [orig+'/'+x for x in os.listdir(str(path))
