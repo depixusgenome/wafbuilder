@@ -57,7 +57,7 @@ class Modules:
         wafbuilder.findpyext(bld, set(mod for mod in mods if mod != 'tests'))
         bld.recurse(mods, 'build')
 
-    def build_static(self):
+    def build_static(self, bld):
         "transfer static sources"
         files = bld.path.ant_glob([i+"/**/static/*."+j
                                    for j in ("css", "js", "map", "svg", "eot",
