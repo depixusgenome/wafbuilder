@@ -21,6 +21,7 @@ class Modules:
         self._all  = () if singles is None else tuple(i for i in singles if Path(i).exists())
         if src is not None:
             self._all += tuple(wafbuilder.wscripted(src))
+        self._src  = src
 
     def run_requirements(self, cnf):
         "prints requirements"
@@ -55,6 +56,50 @@ class Modules:
         wafbuilder.build(bld) # pylint: disable=no-member
         wafbuilder.findpyext(bld, set(mod for mod in mods if mod != 'tests'))
         bld.recurse(mods, 'build')
+
+    def build_static(self):
+        "transfer static sources"
+        files = bld.path.ant_glob([i+"/**/static/*."+j
+                                   for j in ("css", "js", "map", "svg", "eot",
+                                             "ttf", "woff")
+                                   for i in self._src])
+        wafbuilder.copyfiles(bld, 'static', files)
+
+    def check_linting(self, bld): # pylint: disable=too-many-locals
+        "display linting info"
+        stats: dict = {'count': 0}
+        patt        = "pylint: disable="
+        for src in self._src:
+            for name in bld.path.ant_glob(src+"/**/*.py"):
+                if "scripting" in str(name):
+                    continue
+
+                mdl = str(name)[len(str(bld.path)+"/"+src+"/"):]
+                mdl = mdl[:mdl.find('/')]
+                with open(str(name), 'r') as stream:
+                    for line in stream:
+                        if patt not in line:
+                            continue
+                        stats['count'] += 1
+                        tpe = line[line.find(patt)+len(patt):].strip()
+                        if " " in tpe:
+                            tpe = tpe[:tpe.find(" ")]
+                        for i in tpe.split(","):
+                            info = stats.setdefault(i, {'count': 0})
+                            info ['count'] += 1
+                            info.setdefault(mdl, 0)
+                            info[mdl] += 1
+
+        print(f"""
+            Totals
+            =====
+            
+            count: {stats.pop('count')}
+              """)
+        for i, j in sorted(stats.items(), key = lambda x: x[1]['count'])[::-1]:
+            cnt  = j.pop("count")
+            itms = sorted(j.items(), key = lambda k: k[1])[::-1][::5]
+            print(f"{str(i)+':':<35}{cnt:>5}\t\t{itms}")
 
     @classmethod
     def make(cls, locs, simple = False):
