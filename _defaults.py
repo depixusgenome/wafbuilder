@@ -24,6 +24,11 @@ def defaultwscript(path, code = 'make(locals())'):
     Defines default wscripts for all children in a directory.
     This is dynamic.
     """
+    if isinstance(path, (tuple, list, set, frozenset)):
+        for i in path:
+            defaultwscript(i, code)
+        return
+
     import waflib.Utils as _Utils
     if not getattr(_Utils, '__wafbuilder_monkeypatch__', False):
         _Utils.__wafbuilder_monkeypatch__ = True
