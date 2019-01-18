@@ -57,7 +57,8 @@ class GuiMaker:
             "build gui"
             old(bld)
             paths = [bld.bldnode.parent.find_node(i) for i in self.modulepaths]
-            self.build_bokehjs(bld, viewname, list(self.modules), paths, scriptname)
+            mods  = list(self.modules)+[locs['APPNAME']]
+            self.build_bokehjs(bld, viewname, mods, paths, scriptname)
             self.build_doc(bld, scriptname, self.docpath)
 
         locs['build'] = build
@@ -94,17 +95,16 @@ class GuiMaker:
                     break
                 modules.append(modules[-1]+'.'+i)
 
-        for i in sum((j.ant_glob('/**/*.py') for j in paths), []):
+        for i in sum((j.ant_glob('**/*.py') for j in paths), []):
             i = i.srcpath()
             if Path(str(i)).name[:2] != '__':
                 modules.append(str(i)[5:-3].replace("/", ".").replace("\\", "."))
 
         modules = [i for i in modules if i[:2] != '__']
-
-        root = bld.path.ctx.bldnode
-        mods = [i.split('.')[0] for i in modules]
-        mods = [j for i, j in enumerate(mods) if j not in mods[:i]]
-        srcs = sum((root.ant_glob(i.replace('.', '/')+'/**/*.coffee') for i in mods), [])
+        root    = bld.path.ctx.bldnode
+        mods    = [i.split('.')[0] for i in modules]
+        mods    = [j for i, j in enumerate(mods) if j not in mods[:i]]
+        srcs    = sum((root.ant_glob(i.replace('.', '/')+'/**/*.coffee') for i in mods), [])
 
         from wafbuilder import copyroot
         tgt  = copyroot(bld, key+'.js')
