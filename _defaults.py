@@ -51,7 +51,7 @@ def defaultwscript(path, code = 'make(locals())'):
 
     path = Path.cwd()/path
     dirs = [(path/x).resolve()/WSCRIPT_FILE for x in os.listdir(str(path))
-            if x[0] not in ('.', '_')]
+            if x[0] not in ('.', '_') and (path/x).is_dir()]
     _DEFAULT_WAFS.update((i, code) for i in dirs)
 
 def reload(modules):
