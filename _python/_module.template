@@ -1,4 +1,11 @@
-#include <pybind11/pybind11.h>
+#if (__GNUC__ == 8 && __GNUC_MINOR__ == 2)
+# pragma GCC diagnostic push
+# pragma GCC diagnostic ignored "-Wcast-function-type"
+# include <pybind11/pybind11.h>
+# pragma GCC diagnostic pop
+#else
+# include <pybind11/pybind11.h>
+#endif
 namespace @nsname@ { void pymodule(pybind11::module &); }
 
 using namespace pybind11;
