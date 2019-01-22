@@ -21,7 +21,7 @@ CHANNELS = ['', ' -c conda-forge']
 
 class CondaSetup:
     "installs / updates a conda environment"
-    def __init__(self, cnf = None, conda = 'conda', **kwa):
+    def __init__(self, cnf = None, conda = None, **kwa):
         self.envname = kwa.get('envname',     getattr(cnf, 'condaenv',   'root'))
         self.packages = kwa.get('packages', getattr(cnf, 'packages', '').split(','))
         if self.packages == ['']:
@@ -37,7 +37,7 @@ class CondaSetup:
         else:
             lst = [i.strip().lower() for i in getattr(cnf, 'pinned', '').split(',')]
         self.pinned  = kwa.get('pinned',  lst)
-        self._conda  = conda
+        self._conda  = conda if conda else ['conda']
 
     @staticmethod
     def configure(cnf:Context):
@@ -91,9 +91,8 @@ class CondaSetup:
         return subprocess.check_output(self._conda+cmd.split(' '),
                                        stderr=subprocess.DEVNULL)
 
-    @classmethod
-    def __download(cls):
-        if cls.__run('--version'):
+    def __download(self):
+        if self.__run('--version'):
             islin = sys.platform == 'linux'
             site  = "https://repo.continuum.io/miniconda/Miniconda3-latest-"
             site += 'Linux-x86_64.sh' if islin else "Windows-x86_64.exe"
