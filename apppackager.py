@@ -41,14 +41,20 @@ class AppPackager(BuildContext):
 
     @staticmethod
     def __compile(path, inp, outp):
-        with open(str(inp), encoding = 'utf-8') as stream:
-            if not any('from_py_func' in i for i in stream):
-                cur = outp/inp.relative_to(path).with_suffix('.pyc')
-                out = str(cur)
-                opt = 0 if 'reporting' in out else 2
-                py_compile.compile(str(inp), out, optimize = opt)
-                return cur
-        return inp
+        if str(inp).endswith(".pyc"):
+            return inp
+        try:
+            with open(str(inp), encoding = 'utf-8') as stream:
+                if any('from_py_func' in i for i in stream):
+                    return inp
+        except UnicodeDecodeError as exc:
+            pass
+
+        cur = outp/inp.relative_to(path).with_suffix('.pyc')
+        out = str(cur)
+        opt = 0 if 'reporting' in out else 2
+        py_compile.compile(str(inp), out, optimize = opt)
+        return cur
 
     def __zip_files(self, path, out, zips):
         with ZipFile(str(out/(self.libname+".pyz")), "w") as zfile:
@@ -57,7 +63,12 @@ class AppPackager(BuildContext):
                 zfile.write(str(pyc), str(pyc.relative_to(path)))
 
             for mod in zips:
-                for pyc in chain(mod.glob("**/*.pyc"), mod.glob("**/*.py")):
+                files = set(mod.glob("**/*.py"))
+                files.update(
+                    i for i in mod.glob("**/*.pyc")
+                    if i.with_suffix(".py") not in files
+                )
+                for pyc in files:
                     pyc = self.__compile(path, pyc, path)
                     zfile.write(str(pyc), str(pyc.relative_to(path)))
 
