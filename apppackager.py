@@ -47,7 +47,7 @@ class AppPackager(BuildContext):
             with open(str(inp), encoding = 'utf-8') as stream:
                 if any('from_py_func' in i for i in stream):
                     return inp
-        except UnicodeDecodeError as exc:
+        except UnicodeDecodeError:
             pass
 
         cur = outp/inp.relative_to(path).with_suffix('.pyc')
@@ -122,7 +122,7 @@ class AppPackager(BuildContext):
 
         self.__move_files([i for i in mods if i not in zips], out, path, dll)
 
-        final = Path(".")/version()
+        final = Path(".")/(("" if self.doall else "patch_")+version())
         if final.exists():
             rmtree(str(final))
         final.mkdir(exist_ok = True, parents = True)
