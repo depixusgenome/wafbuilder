@@ -4,11 +4,11 @@
 import  sys
 from    typing     import List
 from    pathlib    import Path
-import  bokeh.util.compiler as _compiler
 
 sys.path.append(str(Path(".").resolve()))
 def finddependencies(*modules) -> List[str]:
     "compiles the application as would a normal call to bokeh"
+    import  bokeh.util.compiler as _compiler
     for mod in modules:
         __import__(mod)
     old = _compiler.nodejs_compile
@@ -23,6 +23,7 @@ def finddependencies(*modules) -> List[str]:
 
 def compileapp(*modules) -> str:
     "compiles the application as would a normal call to bokeh"
+    import  bokeh.util.compiler as _compiler
     for mod in modules:
         __import__(mod)
     string = _compiler.bundle_all_models()
