@@ -10,7 +10,6 @@ from types          import ModuleType, FunctionType
 from functools      import wraps
 
 from waflib.Context import Context
-from .git           import lasthash as _gitversion
 
 YES = type('YES', (object,), dict(__doc__ = "Used as a typed enum"))()
 
@@ -192,6 +191,12 @@ def copytargets(bld:Context, arg, items):
     "yields source and targets for copied files"
     root = copyroot(bld, arg)
     for item in items:
+        if isinstance(item, tuple):
+            # bypass the search
+            yield item
+            yield from items
+            return
+
         path = Path(str(item))
         if arg  == '':
             tgt = path.name

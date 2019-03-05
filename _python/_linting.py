@@ -5,7 +5,6 @@ import sys
 import re
 from pathlib          import Path
 from typing           import Sequence, List  # pylint: disable=unused-import
-from pkg_resources    import get_distribution
 from waflib.Context   import Context
 from .._requirements  import REQ as requirements
 from .._utils         import copytargets
@@ -37,17 +36,11 @@ class Linting:
     def __pylintrule():
         crlf   = '' if sys.platform == 'linux' else ',unexpected-line-ending-format'
         pylint = ('${PYLINT} ${SRC} '
-                  + '--init-hook="sys.path.append(\'./\')" '
                   + '--msg-template="{path}:{line}:{column}:{C}: [{symbol}] {msg}" '
                   + '--disable=locally-disabled,fixme%s ' % crlf
-                  + '--reports=no')
-
-        if get_distribution("pylint").version >= '1.7.1':  # pylint: disable=no-member
-            pylint += ' --score=n'
-
-        if (get_distribution("astroid").version == '1.4.8' # pylint: disable=no-member
-                or sys.platform.startswith("win")):
-            pylint += ' --disable=wrong-import-order,invalid-sequence-index'
+                  + '--reports=no '
+                  + '--score=n'
+                  )
 
         for name in ('', 'linting', '..', '../linting'):
             path = Path(name)/'pylintrc'
@@ -110,15 +103,30 @@ class Linting:
         if len(items) == 0:
             return
 
+        deps  = cls.__make_deps(bld, name, items)
+        rules = cls.__make_rules(bld, deps)
+
+        if name in deps:
+            items = [i for _, i in copytargets(bld, name, items)]
+
+        for item in items:
+            for kwargs in rules:
+                bld(source = [item],
+                    name   = str(item)+':'+kwargs['cls_keyword'](None).lower(),
+                    **kwargs)
+
+    @classmethod
+    def __make_deps(cls, bld:Context, name:str, items:Sequence) -> List:
         if cls.INCLUDE_PYEXTS:
             pyext = set(bld.env.pyextmodules)
             if any(i.get_name() == name+':pyext' for i in bld.get_all_task_gen()):
                 pyext.add(name)
 
-            deps = list(pymoduledependencies(items, name) & pyext)
-        else:
-            deps = []
+            return list(pymoduledependencies(items, name) & pyext)
+        return []
 
+    @classmethod
+    def __make_rules(cls, bld, deps) -> list:
         def _scan(_):
             nodes = [bld.get_tgen_by_name(dep+':pyext').tasks[-1].outputs[0] for dep in deps]
             return (nodes, [])
@@ -126,7 +134,7 @@ class Linting:
         rules = [cls.__encodingrule(bld)] # type: List
         if ('python', 'mypy') in requirements:
             rules.append(cls.__mypyrule())
-            rules[-1]['scan'] = _scan
+            rules[-1]['scan']  = _scan
             rules[-1]['group'] = 'mypy'
             if 'mypy' not in bld.group_names:
                 bld.add_group('mypy', move = False)
@@ -137,20 +145,9 @@ class Linting:
             rules[-1]['group'] = 'pylint'
             if 'pylint' not in bld.group_names:
                 bld.add_group('pylint', move = False)
+        return rules
 
-        def _build(item, kwargs):
-            bld(source = [item],
-                name   = str(item)+':'+kwargs['cls_keyword'](None).lower(),
-                **kwargs)
 
-        if name in deps:
-            for _, item in copytargets(bld, name, items):
-                for kwargs in rules:
-                    _build(item, kwargs)
-        else:
-            for item in items:
-                for kwargs in rules:
-                    _build(item, kwargs)
 
 def checkpy(bld:Context, name:str, items:Sequence):
     "builds tasks for checking code"

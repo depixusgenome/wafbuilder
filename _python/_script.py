@@ -2,10 +2,10 @@
 # -*- coding: utf-8 -*-
 "All *basic* python related details"
 from pathlib            import Path
-from typing             import Sequence
+from typing             import Sequence, List
 from waflib.Configure   import conf
 from waflib.Context     import Context
-from .._utils           import YES, runall, addmissing, copyfiles
+from .._utils           import YES, runall, addmissing, copyfiles, copyroot
 from .._requirements    import REQ as requirements
 
 # pylint: disable=unused-import
@@ -17,6 +17,7 @@ from ._linting          import Linting
 from ._conda            import CondaSetup
 
 IS_MAKE = YES
+TESTS   = "__tests__", "tests"
 
 @requirements.addcheck
 def check_python_nodejs(cnf, _, version):
@@ -57,8 +58,29 @@ def buildpymod(bld:Context, name:str, pysrc:Sequence):
     if getattr(bld.options, 'APP_PATH', None) is None:
         removeunknowns(bld, name)
         bld(name = str(bld.path)+":py", features = "py", source = pysrc)
-        Linting.run(bld, name, pysrc)
-    copyfiles(bld, name, pysrc)
+
+    srclist:  List[tuple] = []
+    testlist: List[tuple] = []
+
+    testroot            = copyroot(bld, TESTS[1])
+    srcroot             = copyroot(bld, name)
+    for itm in pysrc:
+        path   = Path(str(itm))
+        parent = path.parent
+        while parent.name not in (TESTS[0], name):
+            parent = parent.parent
+
+        tgt  = str(path.relative_to(parent))
+        if parent.name == name:
+            srclist.append((itm, srcroot.make_node(tgt)))
+        else:
+            testlist.append((itm, testroot.make_node(tgt)))
+
+    copyfiles(bld, name,     srclist)
+    copyfiles(bld, TESTS[1], testlist)
+
+    if getattr(bld.options, 'APP_PATH', None) is None:
+        Linting.run(bld, name, [i for i,_ in srclist])
 
 @conf
 def build_python(bld:Context, name:str, version:str, **kwargs):
