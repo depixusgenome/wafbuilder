@@ -32,6 +32,38 @@ def check_python_mypy(cnf, name, version):
 class Linting:
     "all rules for checking python"
     INCLUDE_PYEXTS = False
+    @classmethod
+    def run(cls, bld:Context, name:str, items:Sequence):
+        "builds tasks for checking code"
+        if bld.options.DO_PY_LINTING is False or len(items) == 0:
+            return
+
+        deps  = cls.__make_deps(bld, name, items)
+        rules = cls.__make_rules(bld, deps)
+
+        if name in deps:
+            items = [i for _, i in copytargets(bld, name, items)]
+
+        for item in items:
+            for kwargs in rules:
+                bld(source = [item],
+                    name   = str(item)+':'+kwargs['cls_keyword'](None).lower(),
+                    **kwargs)
+
+    @staticmethod
+    def options(opt: Context):
+        "add options"
+        return (opt
+            .add_option_group("Python Options")
+            .add_option(
+                "--nolinting",
+                help    = "Discard linting jobs",
+                default = True,
+                dest    = "DO_PY_LINTING",
+                action  = "store_false",
+            )
+        )
+
     @staticmethod
     def __pylintrule():
         crlf   = '' if sys.platform == 'linux' else ',unexpected-line-ending-format'
@@ -98,24 +130,6 @@ class Linting:
                     cls_keyword = lambda _: 'python headers')
 
     @classmethod
-    def run(cls, bld:Context, name:str, items:Sequence):
-        "builds tasks for checking code"
-        if len(items) == 0:
-            return
-
-        deps  = cls.__make_deps(bld, name, items)
-        rules = cls.__make_rules(bld, deps)
-
-        if name in deps:
-            items = [i for _, i in copytargets(bld, name, items)]
-
-        for item in items:
-            for kwargs in rules:
-                bld(source = [item],
-                    name   = str(item)+':'+kwargs['cls_keyword'](None).lower(),
-                    **kwargs)
-
-    @classmethod
     def __make_deps(cls, bld:Context, name:str, items:Sequence) -> List:
         if cls.INCLUDE_PYEXTS:
             pyext = set(bld.env.pyextmodules)
@@ -146,8 +160,6 @@ class Linting:
             if 'pylint' not in bld.group_names:
                 bld.add_group('pylint', move = False)
         return rules
-
-
 
 def checkpy(bld:Context, name:str, items:Sequence):
     "builds tasks for checking code"

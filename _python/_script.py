@@ -98,5 +98,6 @@ def build_python(bld:Context, name:str, version:str, **kwargs):
 def options(opt:Context):
     "Adding conda options"
     CondaSetup.options(opt)
+    Linting.options(opt)
 
 addmissing(locals())
