@@ -50,13 +50,14 @@ def removeunknowns(bld:Context, name:str):
             cls_keyword = lambda _: 'unknowns',
             rule        = _rem)
 
-def buildpymod(bld:Context, name:str, pysrc:Sequence):
+def buildpymod(bld:Context, name:str, pysrc:Sequence, doremove = True, **kwargs):
     "builds a python module"
     if len(pysrc) == 0:
         return
 
     if getattr(bld.options, 'APP_PATH', None) is None:
-        removeunknowns(bld, name)
+        if doremove:
+            removeunknowns(bld, name)
         bld(name = str(bld.path)+":py", features = "py", source = pysrc)
 
     srclist:  List[tuple] = []
@@ -91,7 +92,7 @@ def build_python(bld:Context, name:str, version:str, **kwargs):
     csrc    = kwargs.get('python_cpp', bld.path.ant_glob('**/*.cpp'))
     pysrc   = bld.path.ant_glob('**/*.py')
     buildpyext(bld, name, version, pysrc, csrc, **kwargs)
-    buildpymod(bld, name, pysrc)
+    buildpymod(bld, name, pysrc, **kwargs)
     copyfiles(bld,  name, bld.path.ant_glob('**/*.ipynb'))
 
 @runall

@@ -33,13 +33,13 @@ class Linting:
     "all rules for checking python"
     INCLUDE_PYEXTS = False
     @classmethod
-    def run(cls, bld:Context, name:str, items:Sequence):
+    def run(cls, bld:Context, name:str, items:Sequence, *discards):
         "builds tasks for checking code"
         if bld.options.DO_PY_LINTING is False or len(items) == 0:
             return
 
         deps  = cls.__make_deps(bld, name, items)
-        rules = cls.__make_rules(bld, deps)
+        rules = cls.__make_rules(bld, deps, discards)
 
         if name in deps:
             items = [i for _, i in copytargets(bld, name, items)]
@@ -140,20 +140,20 @@ class Linting:
         return []
 
     @classmethod
-    def __make_rules(cls, bld, deps) -> list:
+    def __make_rules(cls, bld, deps, discards) -> list:
         def _scan(_):
             nodes = [bld.get_tgen_by_name(dep+':pyext').tasks[-1].outputs[0] for dep in deps]
             return (nodes, [])
 
         rules = [cls.__encodingrule(bld)] # type: List
-        if ('python', 'mypy') in requirements:
+        if ('python', 'mypy') in requirements and 'mypy' not in discards:
             rules.append(cls.__mypyrule())
             rules[-1]['scan']  = _scan
             rules[-1]['group'] = 'mypy'
             if 'mypy' not in bld.group_names:
                 bld.add_group('mypy', move = False)
 
-        if ('python', 'pylint') in requirements:
+        if ('python', 'pylint') in requirements and 'pylint' not in discards:
             rules.append(cls.__pylintrule())
             rules[-1]['scan']  = _scan
             rules[-1]['group'] = 'pylint'
@@ -161,6 +161,6 @@ class Linting:
                 bld.add_group('pylint', move = False)
         return rules
 
-def checkpy(bld:Context, name:str, items:Sequence):
+def checkpy(bld:Context, name:str, items:Sequence, *discards):
     "builds tasks for checking code"
-    return Linting.run(bld, name, items)
+    return Linting.run(bld, name, items, *discards)
