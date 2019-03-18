@@ -41,7 +41,7 @@ class PyTesting:
         grp.add_option(
             "--noheadless",
             help    = "Run browsers in without headless mode",
-            default = False,
+            default = True,
             dest    = "TEST_HEADLESS",
             action  = "store_false",
         )
