@@ -55,7 +55,6 @@ class PyTesting:
         os.chdir("build")
         if _.options.TEST_HEADLESS:
             os.environ['DPX_TEST_HEADLESS'] = 'True'
-            import_module("tests.testutils.bokehtesting").HEADLESS = True
 
         cmd = ["tests/", *_.options.TEST_GROUP]
         if not _.options.TEST_COV:
