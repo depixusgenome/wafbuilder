@@ -1,20 +1,80 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"All *basic* python related details"
-from ._pybind11 import pymoduledependencies
+"All python-testing related details"
+class PyTesting:
+    "All python-testing related details"
+    TEST  = 'pytest'
+    COV   = 'coverage.cmdline'
+    OMITS = ["--omit", 'tests/*.py,*waf*.py,*test*.py']
+    HTML  = "Coverage"
+    @staticmethod
+    def options(ctx):
+        "add options"
+        grp = ctx.add_option_group('Test options')
+        for j, k in [
+                ('integration', ('-m', 'integration')),
+                ('unit',        ('-m', 'not integration')),
+                ('all',         ())
+        ]:
+            grp.add_option(
+                f'-{j[0]}', f'--{j}tests',
+                help    = f"Run {j} tests",
+                default = ("-m", "not integration"),
+                dest    = "TEST_GROUP",
+                action  = "store_const",
+                const   = k
+            )
+        grp.add_option(
+            "--coverage",
+            help    = "Run tests with coverage",
+            default = False,
+            dest    = "TEST_COV",
+            action  = "store_true",
+        )
+        grp.add_option(
+            "--coverage",
+            help    = "Create coverage",
+            default = True,
+            dest    = "TEST_COV",
+            action  = "store_true",
+        )
+        grp.add_option(
+            "--noheadless",
+            help    = "Run browsers in without headless mode",
+            default = False,
+            dest    = "TEST_HEADLESS",
+            action  = "store_false",
+        )
 
-def runtest(bld, *names):
-    "runs tests"
-    pyext = set(bld.env.pyextmodules)
-    def _scan(_):
-        deps  = list(pymoduledependencies(names, None) & pyext)
-        nodes = [bld.get_tgen_by_name(dep+':pyext').tasks[-1].outputs[0] for dep in deps]
-        return (nodes, [])
+    @classmethod
+    def test(cls, _):
+        "do unit tests"
+        import os
+        from   pathlib   import Path
+        from   importlib import import_module
+        os.chdir("build")
+        if _.options.TEST_HEADLESS:
+            os.environ['DPX_TEST_HEADLESS'] = 'True'
+            import_module("tests.testutils.bokehtesting").HEADLESS = True
 
-    bld(source      = names,
-        name        = 'pytests',
-        always      = True,
-        color       = 'YELLOW',
-        rule        = '${PYTHON} -m pytest ${SRC} ',
-        scan        = _scan,
-        cls_keyword = lambda _: 'Pytest')
+        cmd = ["tests/", *_.options.TEST_GROUP]
+        if not _.options.TEST_COV:
+            import_module(cls.TEST).cmdline.main(cmd)
+        else:
+            cmd   = ["run", *cls.OMITS, "-m", cls.TEST] + cmd
+            import_module(cls.COV).main(cmd)
+            if not Path(cls.HTML).exists():
+                os.mkdir(cls.HTML)
+            import_module(cls.COV).main(["html", "-i", *cls.OMITS, "-d", cls.HTML])
+
+    @classmethod
+    def make(cls, locs):
+        "add the options & test"
+        def options(ctx, __old__ = locs.pop('options')):
+            __old__(ctx)
+            cls.options(ctx)
+
+        locs.update(
+            options = options,
+            test    = cls.test
+        )
