@@ -33,9 +33,7 @@ class PyTesting:
         grp.add_option(
             "--coverage",
             help    = "Run tests with coverage",
-            default = False,
             dest    = "TEST_COV",
-            action  = "store_true",
         )
         grp.add_option(
             "--noheadless",
