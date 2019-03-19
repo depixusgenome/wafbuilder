@@ -4,6 +4,7 @@
 class PyTesting:
     "All python-testing related details"
     TEST  = 'pytest'
+    OPTS  = ["--tb", "short"]
     COV   = 'coverage.cmdline'
     OMITS = ["--omit", 'tests/*.py,*waf*.py,*test*.py']
     HTML  = "Coverage"
@@ -25,16 +26,14 @@ class PyTesting:
                 const   = k
             )
         grp.add_option(
-            "--coverage",
-            help    = "Run tests with coverage",
-            default = False,
-            dest    = "TEST_COV",
-            action  = "store_true",
+            "--junit",
+            help    = f"Create a junit xml report at the provided path",
+            dest    = "JUNIT_XML",
         )
         grp.add_option(
             "--coverage",
-            help    = "Create coverage",
-            default = True,
+            help    = "Run tests with coverage",
+            default = False,
             dest    = "TEST_COV",
             action  = "store_true",
         )
@@ -53,18 +52,18 @@ class PyTesting:
         from   pathlib   import Path
         from   importlib import import_module
         os.chdir("build")
-        if _.options.TEST_HEADLESS:
+        opt = _.options
+        if opt.TEST_HEADLESS:
             os.environ['DPX_TEST_HEADLESS'] = 'True'
 
-        cmd = ["tests/", *_.options.TEST_GROUP]
-        if not _.options.TEST_COV:
+        junit = () if not opt.JUNIT_XML else ('--junit-xml', opt.JUNIT_XML)
+        cmd   = ["tests/", *opt.TEST_GROUP, *junit, *cls.OPTS]
+        if not opt.TEST_COV:
             import_module(cls.TEST).cmdline.main(cmd)
         else:
-            cmd   = ["run", *cls.OMITS, "-m", cls.TEST] + cmd
-            import_module(cls.COV).main(cmd)
-            if not Path(cls.HTML).exists():
-                os.mkdir(cls.HTML)
-            import_module(cls.COV).main(["html", "-i", *cls.OMITS, "-d", cls.HTML])
+            import_module(cls.COV).main(["run", *cls.OMITS, "-m", cls.TEST, *cmd])
+            Path(opt.TEST_COV).mkdir(parents = True, exist_ok = True)
+            import_module(cls.COV).main(["html", "-i", *cls.OMITS, "-d", opt.TEST_COV])
 
     @classmethod
     def make(cls, locs):
