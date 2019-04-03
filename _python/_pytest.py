@@ -26,6 +26,13 @@ class PyTesting:
                 const   = k
             )
         grp.add_option(
+            "--pv",
+            help    = f"verbose output",
+            dest    = "PYTEST_V",
+            default = False,
+            action  = "store_true",
+        )
+        grp.add_option(
             "--junit",
             help    = f"Create a junit xml report at the provided path",
             dest    = "JUNIT_XML",
@@ -56,6 +63,8 @@ class PyTesting:
 
         junit = () if not opt.JUNIT_XML else ('--junit-xml', opt.JUNIT_XML)
         cmd   = ["tests/", *opt.TEST_GROUP, *junit, *cls.OPTS]
+        if opt.PYTEST_V:
+            cmd.append("-v")
         if not opt.TEST_COV:
             import_module(cls.TEST).cmdline.main(cmd)
         else:
