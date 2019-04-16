@@ -32,47 +32,52 @@ def check_coffee_coffeelint(cnf, name, version):
     mand = not sys.platform.startswith("win")
     requirements.programversion(cnf, name, version, mandatory = mand)
 
+def coffeelintcompiler(bld, tgt, *_):
+    "use coffee lint"
+    path = str(next(
+        (Path(direct)/'coffeelintrc').resolve()
+        for direct in ('', 'linting', '..', '../linting')
+        if (Path(direct)/'coffeelintrc').exists()
+    ))
+
+    out = check_output(
+        [bld.env['COFFEELINT'][0], f'--file={path}', '--reporter=csv', str(tgt)]
+    ).strip().split(b'\n')[1:]
+
+    if out:
+        msg = 'Coffeelint: '+b'\n'.join(out).decode('utf-8')
+        Logs.error(msg)
+        raise Errors.WafError(msg)
+
+def coffeelint(bld):
+    "add rules for linting coffee files"
+
+    if 'COFFEELINT' not in bld.env:
+        return
+
+    if 'coffeelint' not in bld.group_names:
+        bld.add_group('coffeelint', move = False)
+
+    for i in bld.path.ant_glob('**/*.coffee'):
+        bld(
+            source      = [i],
+            rule        = lambda x, *_: coffeelintcompiler(bld, x, *_),
+            color       = 'BLUE',
+            cls_keyword = lambda _: 'CoffeeLint',
+            group       = 'coffeelint',
+        )
+
 @conf
 def build_coffee(bld:Context, name:str, _1, **_2):
-    u"builds all coffee files"
-    if 'coffee' not in requirements:
-        return
-    if 'COFFEE' not in bld.env or getattr(bld.options, 'APP_PATH', None) is not None:
-        return
+    "builds all coffee files"
+    if 'coffee' in requirements:
+        tsx     = bld.path.ant_glob('**/*.tsx')
+        coffees = bld.path.ant_glob('**/*.coffee')
+        copyfiles(bld, name, tsx+coffees)
 
-    tsx = bld.path.ant_glob('**/*.tsx')
-    copyfiles(bld, name, tsx)
+        if getattr(bld.options, 'APP_PATH', None) is None:
+            if 'COFFEE' in bld.env:
+                bld(source = coffees)
 
-    coffees = bld.path.ant_glob('**/*.coffee')
-    if len(coffees) == 0:
-        return
-
-    bld(source = coffees)
-    copyfiles(bld, name, coffees)
-
-    if bld.options.DO_PY_LINTING and 'COFFEELINT' in bld.env:
-        if 'coffeelint' not in bld.group_names:
-            bld.add_group('coffeelint', move = False)
-
-        def _cmd(tgt, *_):
-            path = str(next(
-                (Path(direct)/'coffeelintrc').resolve()
-                for direct in ('', 'linting', '..', '../linting')
-                if (Path(direct)/'coffeelintrc').exists()
-            ))
-            out = check_output(
-                [bld.env['COFFEELINT'][0], f'--file={path}', '--reporter=csv', str(tgt)]
-            ).strip().split(b'\n')[1:]
-            if out:
-                msg = 'Coffeelint: '+b'\n'.join(out).decode('utf-8')
-                Logs.error(msg)
-                raise Errors.WafError(msg)
-
-        for i in coffees:
-            bld(
-                source = [i],
-                rule        = _cmd,
-                color       = 'BLUE',
-                cls_keyword = lambda _: 'CoffeeLint',
-                group  = 'coffeelint',
-            )
+            if bld.options.DO_PY_LINTING:
+                coffeelint(bld)
