@@ -82,7 +82,7 @@ class PyTesting:
             os.environ['DPX_TEST_HEADLESS'] = 'True'
 
         junit = () if not opt.JUNIT_XML else ('--junit-xml', opt.JUNIT_XML)
-        cmd   = ["tests/test_peakcalling.py", *opt.TEST_GROUP, *junit, *cls.OPTS]
+        cmd   = ["tests", *opt.TEST_GROUP, *junit, *cls.OPTS]
         if opt.PYTEST_V:
             cmd.append("-v")
         if not opt.TEST_COV:

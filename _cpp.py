@@ -98,8 +98,8 @@ class Flags(Make):
         if cnf.options.coverageflags:
             name   = cnf.env['COMPILER_CXX']
             args   = COVERAGE.get(name, COVERAGE.get(name[:3], {}))
-            cxx   += args.get('cxx', '')
-            links += args.get('links', '')
+            cxx   += " "+args.get('cxx', '')
+            links += " "+args.get('links', '')
 
         links = cnf.options.linkflaglist
 
