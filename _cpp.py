@@ -32,7 +32,7 @@ FLAGS           = {'/std:c++14': '-std=c++14',
                    '/EHsc':      '',
                   }
 COVERAGE        = {
-    'g++': {"cxx": '-fprofile-arcs --coverage', 'links': "-lgcov --coverage"},
+    'g++': {"cxx": '-fprofile-arcs', 'links': "-lgcov --coverage"},
 }
 
 def _ismsvc(cnf:Context):
@@ -100,8 +100,6 @@ class Flags(Make):
             args   = COVERAGE.get(name, COVERAGE.get(name[:3], {}))
             cxx   += " "+args.get('cxx', '')
             links += " "+args.get('links', '')
-
-        links = cnf.options.linkflaglist
 
         cxx   = cls.convertFlags(cnf, cxx)
         links = cls.convertFlags(cnf, links)
