@@ -32,7 +32,7 @@ FLAGS           = {'/std:c++14': '-std=c++14',
                    '/EHsc':      '',
                   }
 COVERAGE        = {
-    'g++': {"cxx": '-fprofile-arcs', 'links': "-lgcov --coverage"},
+    'g++': {"cxx": '-fprofile-arcs --coverage', 'links': "-lgcov --coverage"},
 }
 
 def _ismsvc(cnf:Context):
