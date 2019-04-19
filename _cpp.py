@@ -31,6 +31,9 @@ FLAGS           = {'/std:c++14': '-std=c++14',
                    '/openmp':    '-fopenmp',
                    '/EHsc':      '',
                   }
+COVERAGE        = {
+    'g++': {"cxx": '-fprofile-arcs --coverage', 'links': "-lgcov --coverage"},
+}
 
 def _ismsvc(cnf:Context):
     return cnf.env['COMPILER_CXX'] == 'msvc'
@@ -62,6 +65,11 @@ class Flags(Make):
                         default = '',
                         action  = 'store',
                         help    = 'define link flags')
+        copt.add_option('--lcov',
+                        dest    = 'coverageflags',
+                        default = False,
+                        action  = 'store_true',
+                        help    = 'add coverage flags')
 
     @staticmethod
     def convertFlags(cnf:Context, cxx, islinks = False):
@@ -86,6 +94,13 @@ class Flags(Make):
         warns = WARNINGS.get(cnf.env['COMPILER_CXX'], WARNINGS[...])
         cxx   = cnf.options.cxxflaglist + ' ' + ' '.join(warns)
         links = cnf.options.linkflaglist
+
+        if cnf.options.coverageflags:
+            name   = cnf.env['COMPILER_CXX']
+            args   = COVERAGE.get(name, COVERAGE.get(name[:3], {}))
+            cxx   += " "+args.get('cxx', '')
+            links += " "+args.get('links', '')
+
         cxx   = cls.convertFlags(cnf, cxx)
         links = cls.convertFlags(cnf, links)
 

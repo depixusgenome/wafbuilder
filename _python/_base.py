@@ -26,7 +26,15 @@ except:
         if vers is not None:
             vers = getattr(vers, '__version__', vers)
     except:
-        pass
+        import subprocess
+        try:
+            out = subprocess.check_output(["conda", "list", NAME]).strip().split(b"\\n")
+            if len(out) == 4:
+                vers = next((i for i in out[-1].split(b" ")[1:] if i != b""), None)
+                if vers is not None:
+                    vers = vers.decode('utf-8')
+        except:
+            pass
 print('unknown version' if vers is None else str(vers))
 '''
 
