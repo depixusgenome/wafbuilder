@@ -73,13 +73,20 @@ class GuiMaker:
         iswin = sys.platform.startswith("win")
         ext   = ".bat" if iswin else ".sh"
         if iswin:
-            cmd = 'cd code\r\n'+r'start /min %~dp0\code\pythonw -I '
-            if debug:
-                cmd = 'cd code\r\n'+r'%~dp0\code\python -I '
+            cmd  = (
+                'cd code\r\n'
+                'SET "PATH=%~dp0\\code\\Library\\bin;%PATH%"\r\n'
+            )
+            cmd += (
+                r'%~dp0\code\python -I '                if debug else
+                r'start /min %~dp0\code\pythonw -I '
+            )
         else:
-            cmd =(r'IR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"\n'
-                  r'cd $DIR/code\n'
-                  r'./bin/python')
+            cmd = (
+                r'IR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"\n'
+                r'cd $DIR/code\n'
+                r'./bin/python'
+            )
 
         fname = str(path.make_node(name+("_debug" if debug else "")+ext))
         with open(fname, 'w', encoding = 'utf-8') as stream:
