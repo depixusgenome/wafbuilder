@@ -113,6 +113,7 @@ class GuiMaker:
         mods    = [i.split('.')[0] for i in modules]
         mods    = [j for i, j in enumerate(mods) if j not in mods[:i]]
         srcs    = sum((root.ant_glob(i.replace('.', '/')+'/**/*.coffee') for i in mods), [])
+        srcs   += sum((root.ant_glob(i.replace('.', '/')+'/**/*.ts') for i in mods), [])
 
         from wafbuilder import copyroot
         tgt  = copyroot(bld, key+'.js')

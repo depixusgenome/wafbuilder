@@ -32,6 +32,12 @@ def check_coffee_coffeelint(cnf, name, version):
     mand = not sys.platform.startswith("win")
     requirements.programversion(cnf, name, version, mandatory = mand)
 
+@requirements.addcheck
+def check_coffee_typescript(cnf, name, version):
+    "check for coffeelint"
+    mand = not sys.platform.startswith("win")
+    requirements.programversion(cnf, "tsc", version, mandatory = mand)
+
 def coffeelintcompiler(bld, tgt, *_):
     "use coffee lint"
     path = str(next(
