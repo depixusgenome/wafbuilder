@@ -71,7 +71,7 @@ def coffeelint(bld):
 def build_coffee(bld:Context, name:str, _1, **_2):
     "builds all coffee files"
     if 'coffee' in requirements:
-        tsx     = bld.path.ant_glob('**/*.tsx')
+        tsx     = bld.path.ant_glob('**/*.ts')
         coffees = bld.path.ant_glob('**/*.coffee')
         copyfiles(bld, name, tsx+coffees)
 
