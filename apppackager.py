@@ -76,7 +76,11 @@ class AppPackager(BuildContext):
 
     def __move_files(self, mods, out, path, dll):
         for mod in mods:
-            for name in chain(mod.glob('**/*.coffee'), mod.glob("_core"+dll)):
+            for name in chain(
+                    mod.glob('**/*.coffee'),
+                    mod.glob('**/*.ts'),
+                    mod.glob("_core"+dll)
+            ):
                 outp = out/name.relative_to(path)
                 outp.parent.mkdir(exist_ok = True, parents = True)
                 name.rename(outp)

@@ -76,18 +76,28 @@ class RequirementManager:
             self.require(lang, key, vers, rtime)
 
     @staticmethod
-    def __pinned(origs):
-        return any(i[2] for i in origs.values())
+    def __pinned(origs, name):
+        pots  = {i[2] for i in origs.values() if i[2]}
+        if not pots:
+            return False
+        pots -= {True}
+        if not pots:
+            return True
+        vers  = {i[:i.rfind('=')] for i in pots}
+        if not len(vers) == 1:
+            raise RuntimeError(f"Pinned versions for {name} disagree: {origs}")
+        chan  = {i[i.rfind('='):] for i in pots} - {''}
+        if not len(chan) <= 1:
+            raise RuntimeError(f"Pinned channels for {name} disagree: {origs}")
+        return next(iter(vers))+next(iter(chan), '')
 
-    @staticmethod
-    def __version(origs):
-        pinned = set(str(i[0]) for i in origs.values() if i[2])
-        if len(pinned) > 1:
-            raise IndexError('Too many pinned versions')
-        elif len(pinned):
-            return next(iter(pinned))
-        else:
-            return max(i[0] for i in origs.values())
+    @classmethod
+    def __version(cls, origs, name):
+        vers = max(i[0] for i in origs.values())
+        if any(vers != i[0] for i in origs.values() if i[2]):
+            raise RuntimeError(f"Versions for {name} disagree: {origs}")
+        cls.__pinned(origs, name)
+        return vers
 
     def require(self, lang = None, name = None, version = None, rtime = True, **kwa):
         "adds a requirement"
@@ -101,9 +111,16 @@ class RequirementManager:
                         .setdefault(name, OrderedDict()))
 
                 val  = str(version).strip()
-                tmp[appname()] = (LooseVersion(val.replace('=', '')),
-                                  rtime,
-                                  val.startswith('='))
+                vers = val[1:] if val.startswith('=') else val
+                tmp[appname()] = (
+                    LooseVersion(vers[:vers.find('=')] if '=' in vers else vers),
+                    rtime,
+                    (
+                        False                   if '=' not in val else
+                        vers[vers.find('=')+1:] if '=' in vers    else
+                        True
+                    )
+                )
 
             elif isinstance(name, Dict):
                 self._reqfromnamedict(lang, name, rtime, kwa)
@@ -160,7 +177,7 @@ class RequirementManager:
         "returns build only dependencies"
         if lang is None:
             return {lang: self.buildonly(lang) for lang in self._reqs}
-        return {name: self.__version(origs)
+        return {name: self.__version(origs, name)
                 for name, origs in self._reqs[lang].items()
                 if not any(isrt for _1, isrt, _2 in origs.values())}
 
@@ -168,7 +185,7 @@ class RequirementManager:
         "returns build and runtime dependencies"
         if lang is None:
             return {lang: self.runtime(lang) for lang in self._reqs}
-        return {name: self.__version(origs)
+        return {name: self.__version(origs, name)
                 for name, origs in self._reqs[lang].items()
                 if any(isrt for _1, isrt, _2 in origs.values())}
 
@@ -180,9 +197,9 @@ class RequirementManager:
             assert name is None
             return {lang: self(lang) for lang in self._reqs}
         if name is None:
-            return {name: self.__version(origs)
+            return {name: self.__version(origs, name)
                     for name, origs in self._reqs[lang].items()}
-        return self.__version(self._reqs[lang][name])
+        return self.__version(self._reqs[lang][name], name)
 
     def version(self, lang, name = None, allorigs = False):
         "returns the version of a package"
@@ -202,7 +219,7 @@ class RequirementManager:
             return None
         if allorigs:
             return {i:j[:2] for i, j in origs.items()}
-        return self.__version(origs)
+        return self.__version(origs, name)
 
     def pinned(self, lang = None, name = None):
         "returns pinned packages"
@@ -216,9 +233,9 @@ class RequirementManager:
             val = self._reqs.get(lang, None)
             if val is None:
                 return []
-            return [i for i, origs in val.items() if self.__pinned(origs)]
+            return [i for i, origs in val.items() if self.__pinned(origs, i)]
         origs = self._reqs.get(lang, {}).get(name, None)
-        return origs is not None and self.__pinned(origs)
+        return origs is not None and self.__pinned(origs, name)
 
     def __contains__(self, args):
         if isinstance(args, str):
@@ -236,7 +253,7 @@ class RequirementManager:
                        name  :str,
                        minver:LooseVersion,
                        reg       = None,
-                       mandatory = True):
+                       mandatory = True) -> bool:
         "check version of a program"
         if reg is None:
             areg = name
@@ -273,9 +290,13 @@ class RequirementManager:
     def tostream(self, stream = None):
         "prints requirements"
         def _print(name, origs, tpe):
-            vers = str(self.__version(origs))
-            if self.__pinned(origs):
+            vers   = str(self.__version(origs, name))
+            pinned = self.__pinned(origs, name)
+            if pinned is True:
                 vers = '='+vers
+            elif pinned is not False:
+                vers = '='+vers+'='+pinned
+
             print(' -{:<20}{:<20}{:<}'.format(name, vers, tpe), file = stream)
 
         for lang, names in self.version(None).items():

@@ -42,6 +42,7 @@ class CondaSetup: # pylint: disable=too-many-instance-attributes
             lst = [i.strip().lower() for i in getattr(cnf, 'pinned', '').split(',')]
         self.pinned  = kwa.get('pinned',  lst)
         self._conda  = conda if conda else ['conda']
+        self._nodejs = 'nodejs'
 
     @staticmethod
     def configure(cnf:Context):
@@ -126,14 +127,42 @@ class CondaSetup: # pylint: disable=too-many-instance-attributes
     def __createenv(self):
         "create conda environment"
         if self.__run('list -n '+ self.envname):
-            version = self.reqs('python', 'numpy')
-            pyvers  = '.'.join(str(self.reqs('python', 'python')).split('.')[:2])
-            cmd     = f'create --yes -n {self.envname} python={pyvers} numpy>={version}'
+            version = requirements('python', 'numpy')
+            pyvers  = '.'.join(str(requirements('python', 'python')).split('.')[:2])
+            pinned  = requirements.pinned('python', 'python')
+            chan    = ""
+            if pinned in (False, True):
+                pinned = ''
+            elif '=' in pinned:
+                chan   = '-c ' + pinned[pinned.rfind('=')+1:]
+                pinned = '='   + pinned[:pinned.rfind('=')]
+            else:
+                pinned = '='   + pinned
+
+            nppinned  = requirements.pinned('python', 'numpy')
+            if nppinned in (True, False):
+                nppinned = ''
+            elif '=' in nppinned:
+                if nppinned[nppinned.rfind('=')+1:] != chan[3:]:
+                    raise RuntimeError("numpy & python must have the same channel")
+                chan     = '-c '+ nppinned[nppinned.rfind('=')+1:]
+                nppinned = '='  + nppinned[:nppinned.rfind('=')]
+            else:
+                nppinned = '='  + nppinned
+
+
+            cmd = (
+                f'create --yes -n {self.envname} python={pyvers}{pinned}'
+                f' numpy>={version}{nppinned} {chan}'
+            )
+
             if self.__ismin('numpy'):
-                cmd = cmd.replace('>=', '=')
+                cmd = cmd.replace('numpy>=', 'numpy=')
 
             Logs.info(cmd)
             self.__run(cmd)
+        else:
+            Logs.info("found env %s", self.envname)
 
     def __ismin(self, name):
         return self.minvers or name.lower() in self.pinned
@@ -165,12 +194,20 @@ class CondaSetup: # pylint: disable=too-many-instance-attributes
 
     def __condainstall(self, name, version):
         "installs a module with conda"
-        cmd = '-n '+self.envname+ ' "' + name
+        cmd      = '-n '+self.envname+ ' "' + name
+        channels = CHANNELS
         if version is not None:
             cmd += ('=' if self.__ismin(name) else '>=') + str(version)
-        cmd += '"'
 
-        for channel in CHANNELS:
+        pinned   = requirements.pinned('python', name)
+        if '=' in str(pinned):
+            channels = [pinned[pinned.rfind('=')+1:]]
+            cmd     += '='+pinned[:pinned.rfind('=')]
+        elif isinstance(pinned, str):
+            cmd    += '='+pinned
+        cmd     += '"'
+
+        for channel in channels:
             if not self.__run('install ' + cmd + channel+ ' --yes'):
                 return True
             Logs.info("failed on channel '%s'", channel)
@@ -235,7 +272,12 @@ class CondaSetup: # pylint: disable=too-many-instance-attributes
             if name == 'python':
                 continue
 
-            Logs.info("checking: %s=%s", name, version)
+            Logs.info(
+                "checking: %s%s%s",
+                name,
+                '=' if self.__ismin(name) else '>=',
+                version
+            )
             if self.__isgood(name, version, res):
                 continue
 
@@ -262,9 +304,10 @@ class CondaSetup: # pylint: disable=too-many-instance-attributes
                 cmd += ["%s>=%s" % (name, version)]
             subprocess.check_call(cmd)
 
-    def __coffee_run(self):
-        "Installs coffee/js modules"
-        itms  = self.reqs('coffee', runtimeonly = self.rtime)
+    def __nodejs_run(self):
+        "Installs nodejs modules"
+        name  = self._nodejs
+        itms  = requirements(name, runtimeonly = self.rtime)
         if len(self.packages):
             itms = {i: j for i, j in itms.items() if i in self.packages}
 
@@ -273,11 +316,11 @@ class CondaSetup: # pylint: disable=too-many-instance-attributes
 
         def _get(env):
             if sys.platform.startswith('win'):
-                path = Path(env)/"Scripts"/"npm"
+                path = Path(env)/"Scripts"/'npm'
                 if not path.exists():
-                    path = Path(env)/"npm"
+                    path = Path(env)/'npm'
             else:
-                path = Path(env)/"bin"/"npm"
+                path = Path(env)/"bin"/'npm'
 
             assert path.exists(), path
 
@@ -296,12 +339,21 @@ class CondaSetup: # pylint: disable=too-many-instance-attributes
         assert npm is not None
 
         for info in itms.items():
-            if info[0] == 'coffee':
-                info = 'coffeescript', info[1]
-
+            if info[0] == self._nodejs:
+                continue
             cmd = npm+' install --global  %s' % info[0]
+            if self.__ismin(info[0]):
+                cmd += '@'+requirements.version(self._nodejs, info[0])
             Logs.info(cmd)
             os.system(cmd)
+
+    def __nodejs_req(self):
+        if (
+                self._nodejs in requirements
+                and ('python', self._nodejs) not in requirements
+        ):
+            version = requirements.version(self._nodejs, self._nodejs)
+            requirements.require('python', self._nodejs, version)
 
     def copyenv(self):
         "copies a environment"
@@ -342,9 +394,11 @@ class CondaSetup: # pylint: disable=too-many-instance-attributes
         "Installs conda"
         self.__download()
         self.__createenv()
+        if not sys.platform.startswith("win"):
+            self.__nodejs_req()
         self.__python_run()
         if not sys.platform.startswith("win"):
-            self.__coffee_run()
+            self.__nodejs_run()
 
 def condasetup(cnf:Context = None, **kwa):
     "installs / updates a conda environment"

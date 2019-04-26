@@ -21,22 +21,28 @@ TaskGen.declare_chain(
     install_path = None)
 
 @requirements.addcheck
-def check_coffee(cnf, name, version):
-    "check for coffeescript"
+def check_nodejs(cnf, name, version):
+    "check for nodejs"
     mand = not sys.platform.startswith("win")
-    requirements.programversion(cnf, name, version, mandatory = mand)
+    requirements.programversion(cnf, 'node', version, mandatory = mand)
 
 @requirements.addcheck
-def check_coffee_coffeelint(cnf, name, version):
-    "check for coffeelint"
-    mand = not sys.platform.startswith("win")
-    requirements.programversion(cnf, name, version, mandatory = mand)
-
-@requirements.addcheck
-def check_coffee_typescript(cnf, name, version):
+def check_nodejs_typescript(cnf, _, version):
     "check for coffeelint"
     mand = not sys.platform.startswith("win")
     requirements.programversion(cnf, "tsc", version, mandatory = mand)
+
+def build_typescript(bld:Context, name:str):
+    "builds all coffee files"
+    if ('nodejs', 'typescript') not in requirements:
+        return
+    copyfiles(bld, name, bld.path.ant_glob('**/*.ts'))
+
+@requirements.addcheck
+def check_nodejs_coffeelint(cnf, name, version):
+    "check for coffeelint"
+    mand = not sys.platform.startswith("win")
+    requirements.programversion(cnf, name, version, mandatory = mand)
 
 def coffeelintcompiler(bld, tgt, *_):
     "use coffee lint"
@@ -73,17 +79,23 @@ def coffeelint(bld):
             group       = 'coffeelint',
         )
 
-@conf
-def build_coffee(bld:Context, name:str, _1, **_2):
+def build_coffeescript(bld:Context, name:str):
     "builds all coffee files"
-    if 'coffee' in requirements:
-        tsx     = bld.path.ant_glob('**/*.ts')
-        coffees = bld.path.ant_glob('**/*.coffee')
-        copyfiles(bld, name, tsx+coffees)
+    if ('nodejs', 'coffeescript') not in requirements:
+        return
 
-        if getattr(bld.options, 'APP_PATH', None) is None:
-            if 'COFFEE' in bld.env:
-                bld(source = coffees)
+    coffees = bld.path.ant_glob('**/*.coffee')
+    copyfiles(bld, name, coffees)
 
-            if bld.options.DO_PY_LINTING:
-                coffeelint(bld)
+    if getattr(bld.options, 'APP_PATH', None) is None:
+        if 'COFFEE' in bld.env:
+            bld(source = coffees)
+
+        if bld.options.DO_PY_LINTING:
+            coffeelint(bld)
+
+@conf
+def build_nodejs(bld:Context, name:str, _1, **_2):
+    "builds all coffee/typescript files"
+    build_typescript(bld, name)
+    build_coffeescript(bld, name)

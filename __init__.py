@@ -83,7 +83,7 @@ def addbuild(name:str, glob:Optional[dict] = None):
 
 _DEFAULT = ['python']
 def default(*args):
-    u"Sets the default builder(s) to use: cpp, py or coffee"
+    "Sets the default builder(s) to use: cpp, py or coffee or typescript"
     _DEFAULT.clear()
     _DEFAULT.extend(args)
 

@@ -11,18 +11,12 @@ from .._requirements    import REQ as requirements
 # pylint: disable=unused-import
 from ._pybind11         import PyBind11, buildpyext
 from ._numpy            import Numpy
-from ._nodejs           import _         # pylint: disable=reimported
 from ._base             import toload
 from ._linting          import Linting
 from ._conda            import CondaSetup
 
 IS_MAKE = YES
 TESTS   = "__tests__", "tests"
-
-@requirements.addcheck
-def check_python_nodejs(cnf, _, version):
-    "checks python's nodejs"
-    requirements.programversion(cnf, 'node', version)
 
 @runall
 def configure(cnf:Context):
@@ -52,7 +46,7 @@ def removeunknowns(bld:Context, name:str):
             cls_keyword = lambda _: 'unknowns',
             rule        = _rem)
 
-def buildpymod(bld:Context, name:str, pysrc:Sequence, doremove = True, **kwargs):
+def buildpymod(bld:Context, name:str, pysrc:Sequence, doremove = True, **_):
     "builds a python module"
     if len(pysrc) == 0:
         return
