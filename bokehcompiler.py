@@ -26,8 +26,9 @@ def compileapp(*modules) -> str:
     import  bokeh.util.compiler as _compiler
     for mod in modules:
         __import__(mod)
+    mdls   = getattr(_compiler, '_get_custom_models')(None)
     string = _compiler.bundle_all_models()
-    return f"/*KEY={_compiler.calc_cache_key()}*/\n"+string
+    return f"/*KEY={_compiler.calc_cache_key(mdls)}*/\n"+string
 
 class GuiMaker:
     "make gui"
