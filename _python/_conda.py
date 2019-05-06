@@ -348,12 +348,18 @@ class CondaSetup: # pylint: disable=too-many-instance-attributes
             os.system(cmd)
 
     def __nodejs_req(self):
+        name = self._nodejs
         if (
-                self._nodejs in requirements
-                and ('python', self._nodejs) not in requirements
+                name in requirements
+                and ('python', name) not in requirements
         ):
-            version = requirements.version(self._nodejs, self._nodejs)
-            requirements.require('python', self._nodejs, version)
+            itms  = requirements(name, runtimeonly = self.rtime)
+            if len(self.packages):
+                itms = {i: j for i, j in itms.items() if i in self.packages}
+
+            if len(itms) > 0:
+                version = requirements.version(name, name)
+                requirements.require('python', name, version)
 
     def copyenv(self):
         "copies a environment"
