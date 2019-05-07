@@ -23,12 +23,17 @@ def finddependencies(*modules) -> List[str]:
 
 def compileapp(*modules) -> str:
     "compiles the application as would a normal call to bokeh"
-    import  bokeh.util.compiler as _compiler
+    import bokeh
+    import bokeh.util.compiler as _compiler
     for mod in modules:
         __import__(mod)
-    mdls   = getattr(_compiler, '_get_custom_models')(None)
+
+    mdls  = (
+        () if bokeh.__version__ == '1.0.4' else
+        getattr(_compiler, '_get_custom_models')(None)
+    )
     string = _compiler.bundle_all_models()
-    return f"/*KEY={_compiler.calc_cache_key(mdls)}*/\n"+string
+    return f"/*KEY={_compiler.calc_cache_key(*mdls)}*/\n"+string
 
 class GuiMaker:
     "make gui"
