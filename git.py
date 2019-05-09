@@ -6,7 +6,7 @@ import os
 import subprocess
 
 def _cmd(*args) -> str:
-    if any(os.path.exists('../'*i+'.git') for i in range(5)):
+    if any(os.path.exists('../'*i+'.git/refs/heads/master') for i in range(5)):
         return (subprocess.check_output(('git',)+tuple(args),
                                         stderr = subprocess.DEVNULL)
                 .strip().decode('utf-8'))
@@ -50,4 +50,5 @@ def branch() -> str:
 
 def isdirty() -> bool:
     u"returns whether we're sitting in-between tags"
-    return version()[-1] == '+'
+    vers = version()
+    return vers[-1] == '+' if vers else False

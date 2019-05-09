@@ -122,7 +122,7 @@ class Flags(Make):
 
 class Boost(Make):
     u"deal with cxx/ld flags"
-    _H_ONLY = 'accumulators', 'preprocessor'
+    _H_ONLY = 'accumulators', 'preprocessor', 'beast'
 
     @staticmethod
     def getlibs():
@@ -157,19 +157,28 @@ class Boost(Make):
             return
 
         if not cnf.options.boost_includes and not cnf.options.boost_libs:
-            path = Path(cnf.env["PYTHON"][0]).parent
-            if sys.platform.startswith("win32"):
-                path /= "Library"
+            rem = 'PYTHON' not in cnf.env
+            if rem:
+                cnf.find_program("python", var="PYTHON", mandatory=False)
+            if 'PYTHON' in cnf.env:
+                path = Path(cnf.env["PYTHON"][0]).parent
 
-            for i in range(3):
-                if (path/"include"/"boost").exists() and (path/"lib").exists():
-                    cnf.options.boost_includes = str(path/"include")
-                    cnf.options.boost_libs     = str(path/"lib")
-                    break
-                path = path.parent
+                if sys.platform.startswith("win32"):
+                    path /= "Library"
+
+                for i in range(3):
+                    if (path/"include"/"boost").exists() and (path/"lib").exists():
+                        cnf.options.boost_includes = str(path/"include")
+                        cnf.options.boost_libs     = str(path/"lib")
+                        break
+                    path = path.parent
+            if rem:
+                del cnf.env['PYTHON']
 
         cnf.check_boost(lib = ' '.join(libs-set(cls._H_ONLY)), mandatory = True)
-        if sys.platform.startswith("win32"):
+        if 'LIB_BOOST' not in cnf.env:
+            cnf.env['LIB_BOOST']= []
+        elif sys.platform.startswith("win32"):
             cnf.env['LIB_BOOST']= [i.replace("-sgd-", "-gd-") for i in cnf.env["LIB_BOOST"]]
         else:
             path = Path(cnf.env["LIBPATH_BOOST"][0])
