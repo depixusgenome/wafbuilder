@@ -88,7 +88,7 @@ def pymoduledependencies(pysrc, name = None):
 
 def findpyext(bld:Context, items:Sequence):
     "returns a list of pyextension in that module"
-    if not hascompiler(bld):
+    if not hascompiler(bld) or ('python', 'pybind11') not in requirements:
         return
 
     names = list(items)
