@@ -14,6 +14,12 @@ from waflib.TaskGen     import after_method,feature
 from ._utils            import (YES, runall, addmissing,
                                 Make, copyargs, copyroot, loading)
 from ._requirements     import REQ as requirements
+from .git               import (
+    version        as _gitversion,
+    lasthash       as _gitlasthash,
+    isdirty        as _gitisdirty,
+    lasttimestamp  as _gitlasttimestamp
+)
 
 IS_MAKE          = YES
 CXX_OPTION_GROUP = 'C++ Options'
@@ -269,7 +275,7 @@ def check_cpp_default(cnf:Context, name:str, version:Optional[str]):
 
 def hasmain(csrc):
     u"detects whether a main function is declared"
-    pattern = re.compile(r'\s*int\s*main\s*(\s*int\s*\w+\s*,\s*(const\s*)?char\s')
+    pattern = re.compile(r'\s*int\s*main\s*\(\s*int\s*\w+\s*,\s*(const\s*)?char\s')
     for item in csrc:
         with closing(open(item.abspath(), 'r')) as stream:
             if any(pattern.match(line) is not None for line in stream):
@@ -291,12 +297,18 @@ def build_cpp(bld:Context, name:str, version:str, **kwargs):
 
     def _template(post):
         res = bld.srcnode.find_resource(__package__+'/_program.template')
-        return bld(features = 'subst',
-                   source   = res,
-                   target   = name+"_%sheader.cpp" % post,
-                   name     = str(bld.path)+":%sheader" % post,
-                   nsname   = name+'_'+post,
-                   version  = version).target
+        return bld(
+            features = 'subst',
+           source   = res,
+           target   = name+"_%sheader.cpp" % post,
+           name     = str(bld.path)+":%sheader" % post,
+           nsname   = name+'_'+post,
+           version  = version,
+           lasthash = _gitlasthash(name),
+           isdirty  = _gitisdirty(name),
+           timestamp= _gitlasttimestamp(name),
+           cpp_compiler_name = bld.cpp_compiler_name()
+        ).target
 
     if len(csrc):
         csrc.append(_template('lib'))

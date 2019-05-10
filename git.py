@@ -48,7 +48,7 @@ def branch() -> str:
     u"returns current branch"
     return _cmd('rev-parse', '--abbrev-ref', 'HEAD')
 
-def isdirty() -> bool:
+def isdirty(path = None) -> bool:
     u"returns whether we're sitting in-between tags"
-    vers = version()
+    vers = version(path)
     return vers[-1] == '+' if vers else False
