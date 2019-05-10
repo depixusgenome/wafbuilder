@@ -35,7 +35,11 @@ class Modules:
         self._all  = () if singles is None else tuple(i for i in singles if Path(i).exists())
         if src is not None:
             self._all += tuple(wafbuilder.wscripted(src))
-        self._src  = [src] if isinstance(src, str) else list(src)
+        self._src  = (
+            [src] if isinstance(src, str) else
+            ()    if src is None else
+            list(src)
+        )
 
     @staticmethod
     def run_condaenvname(cnf):
