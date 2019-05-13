@@ -1,7 +1,8 @@
+#include <string>
 namespace @nsname@ { namespace __git__ {
-    char const * __version__   = "@version@";
-    char const * __lasthash__  = "@lasthash@";
-    char const * __timestamp__ = "@timestamp@";
-    char const * __isdirty__   = "@isdirty@";
-    char const * __compiler__  = "@cpp_compiler_name@";
+    std::string __version__   () { return  "@version@"; }
+    std::string __lasthash__  () { return  "@lasthash@";}
+    std::string __timestamp__ () { return  "@timestamp@";}
+    std::string __isdirty__   () { return  "@isdirty@";}
+    std::string __compiler__  () { return  "@cpp_compiler_name@";}
 }}

@@ -285,7 +285,12 @@ def hasmain(csrc):
 @conf
 def build_cpp(bld:Context, name:str, version:str, **kwargs):
     u"builds a cpp extension"
-    csrc = bld.path.ant_glob('**/*.cpp', exclude = kwargs.get('python_cpp', []))
+    rem  = str(bld.bldnode)
+    csrc = [
+        i
+        for i in bld.path.ant_glob('**/*.cpp', exclude = kwargs.get('python_cpp', []))
+        if not str(i).startswith(rem)
+    ]
     if len(csrc) == 0:
         return
 
@@ -293,7 +298,6 @@ def build_cpp(bld:Context, name:str, version:str, **kwargs):
     csrc = [i for i in csrc if csrc is not prog]
 
     args = copyargs(kwargs)
-    args.setdefault('target', copyroot(bld,None).make_node(name))
 
     def _template(post):
         res = bld.srcnode.find_resource(__package__+'/_program.template')
@@ -310,6 +314,7 @@ def build_cpp(bld:Context, name:str, version:str, **kwargs):
            cpp_compiler_name = bld.cpp_compiler_name()
         ).target
 
+    args.setdefault('target', name)
     if len(csrc):
         csrc.append(_template('lib'))
         args['source'] = csrc
