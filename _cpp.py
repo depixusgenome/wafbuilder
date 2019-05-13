@@ -28,6 +28,7 @@ WARNINGS         = {Ellipsis: ['-Werror=implicit-function-declaration',
                     'msvc':   ['/W3']}
 FLAGS           = {'/std:c++14': '-std=c++14',
                    '/std:c++17': '-std=c++17',
+                   '/std:c++20': '-std=c++20',
                    '/openmp':    '-fopenmp',
                    '/EHsc':      '',
                   }
@@ -43,17 +44,20 @@ def _isrequired():
 
 class Flags(Make):
     u"deal with cxx/ld flags"
-    @staticmethod
-    def options(opt):
+    DEFAULT_CXX = {'linux': '-std=c++17', 'msvc': '/std:c++14'}
+    @classmethod
+    def defaultcxx(cls) -> str:
+        "return the default cxx"
+        return cls.DEFAULT_CXX["msvc" if sys.platform.startswith('win') else 'linux']
+
+    @classmethod
+    def options(cls, opt):
         u"add options"
         if not _isrequired():
             return
 
-        copt = opt.add_option_group(CXX_OPTION_GROUP)
-        if sys.platform.startswith('win'):
-            cxxflags = '/std:c++14 /EHsc'
-        else:
-            cxxflags = '-std=c++17 -g'
+        copt     = opt.add_option_group(CXX_OPTION_GROUP)
+        cxxflags = cls.defaultcxx()+(' /EHsc' if sys.platform.startswith('win') else ' -g')
 
         copt.add_option('--cxxflags',
                         dest    = 'cxxflaglist',
@@ -120,11 +124,13 @@ class Boost(Make):
 
     @staticmethod
     def getlibs():
+        "find boost libs"
         names = set()
         curr  = LooseVersion('0.0')
         req   = requirements.version('cpp', allorigs = False)
         if req is None:
-            return
+            return names, curr
+
         for name, origs in req.items():
             if not name.startswith('boost_'):
                 continue
@@ -166,7 +172,9 @@ class Boost(Make):
             path = Path(cnf.env["LIBPATH_BOOST"][0])
             good = []
             for i in cnf.env["LIB_BOOST"]:
-                if (path/f"lib{i}").exists():
+                print(path, i, i[:i.find('.so')+3],  (path/f"lib{i}").exists(),
+                      (path/f"lib{i[:i.find('.so')+3]}").exists())
+                if i.endswith('.so') and (path/f"lib{i}").exists():
                     good.append(i)
                 elif (path/f"lib{i[:i.find('.so')+3]}").exists():
                     good.append(i[:i.find('.so')])
@@ -221,7 +229,7 @@ def check_cpp_default(cnf:Context, name:str, version:Optional[str]):
     u"Adds a requirement checker"
     if name.startswith('boost'):
         return
-    elif name.startswith('python_'):
+    if name.startswith('python_'):
         base = name[len('python_'):]
         cond = 'ver >= num('+str(version).replace('.',',')+')'
         cnf.check_python_module(base, condition = cond)

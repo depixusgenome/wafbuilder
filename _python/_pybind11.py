@@ -39,7 +39,7 @@ class PyBind11(Make):
         if getattr(cnf.options, 'pybind11', None) is not None:
             store(cnf, '-I'+cnf.options.pybind11)
 
-        cnf.env.append_unique('CXXFLAGS_PYEXT', CppFlags.convertFlags(cnf, '-std=c++14'))
+        cnf.env.append_unique('CXXFLAGS_PYEXT', CppFlags.defaultcxx())
         def _build(bld):
             lib_node = bld.srcnode.make_node('pybind11example.cpp')
             lib_node.write("""
