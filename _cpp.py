@@ -172,8 +172,6 @@ class Boost(Make):
             path = Path(cnf.env["LIBPATH_BOOST"][0])
             good = []
             for i in cnf.env["LIB_BOOST"]:
-                print(path, i, i[:i.find('.so')+3],  (path/f"lib{i}").exists(),
-                      (path/f"lib{i[:i.find('.so')+3]}").exists())
                 if i.endswith('.so') and (path/f"lib{i}").exists():
                     good.append(i)
                 elif (path/f"lib{i[:i.find('.so')+3]}").exists():
