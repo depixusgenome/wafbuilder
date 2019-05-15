@@ -295,3 +295,4 @@ class RequirementManager:
         _reload(modules)
 
 REQ = RequirementManager()
+OPT = RequirementManager()

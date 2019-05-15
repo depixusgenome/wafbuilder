@@ -23,6 +23,12 @@ class Modules:
             self._all += tuple(wafbuilder.wscripted(src))
         self._src  = src
 
+    @staticmethod
+    def run_condaenvname(cnf):
+        "prints requirements"
+        from wafbuilder.shellvars import condaenvname
+        condaenvname(cnf)
+
     def run_requirements(self, cnf):
         "prints requirements"
         from wafbuilder import requirements as _REQ
@@ -108,14 +114,18 @@ class Modules:
 
     def simple(self, cachepath = 'build/'):
         "simple config"
+        class _CondaEnvName(basecontext(cachepath)):
+            fun = cmd = 'condaenvname'
         class _Requirements(basecontext(cachepath)):
             fun = cmd = 'requirements'
         class _Test(BuildContext):
             fun = cmd = 'test'
 
-        return dict(_Requirements = _Requirements,
+        return dict(_CondaEnvName = _CondaEnvName,
+                    _Requirements = _Requirements,
                     _Test         = _Test,
                     requirements  = self.run_requirements,
+                    condaenvname  = self.run_condaenvname,
                     options       = self.run_options,
                     configure     = self.run_configure,
                     build         = self.run_build,

@@ -14,16 +14,17 @@ from   distutils.version    import LooseVersion
 
 from waflib                 import Logs
 from waflib.Context         import Context
-from .._requirements        import REQ as requirements
+from .._requirements        import REQ as requirements, OPT as suggested
 from .._cpp                 import Boost
 
 CHANNELS = ['', ' -c conda-forge']
 
-class CondaSetup:
+class CondaSetup: # pylint: disable=too-many-instance-attributes
     "installs / updates a conda environment"
     def __init__(self, cnf = None, conda = None, **kwa):
-        self.envname = kwa.get('envname',     getattr(cnf, 'condaenv',   'root'))
+        self.envname  = kwa.get('envname',  getattr(cnf, 'condaenv', 'root'))
         self.packages = kwa.get('packages', getattr(cnf, 'packages', '').split(','))
+        self.reqs     = kwa.get('required', requirements)
         if self.packages == ['']:
             self.packages = []
 
@@ -32,7 +33,7 @@ class CondaSetup:
         self.copy    = kwa.get('copy', None)
 
         if getattr(cnf, 'pinned', '') == '':
-            lst = requirements.pinned()
+            lst = self.reqs.pinned()
             lst.extend(i.replace('python-', '') for i in lst if 'python-' in i)
         else:
             lst = [i.strip().lower() for i in getattr(cnf, 'pinned', '').split(',')]
@@ -42,6 +43,10 @@ class CondaSetup:
     @staticmethod
     def configure(cnf:Context):
         "get conda script"
+        env = getattr(cnf.options, 'condaenv', 'root')
+        if env == 'root':
+            env = os.environ.get('CONDA_DEFAULT_ENV', 'base')
+        cnf.env.append_value('CONDA_DEFAULT_ENV', env)
         cnf.find_program("conda", var="CONDA", mandatory=True)
 
     @staticmethod
@@ -53,6 +58,12 @@ class CondaSetup:
                        action  = 'store',
                        default = 'root',
                        help    = u"conda environment name")
+
+        grp.add_option('--suggested',
+                       dest    = 'suggested',
+                       action  = 'store_true',
+                       default = False,
+                       help    = u"install suggested modules as well")
 
         grp.add_option('--pinned',
                        dest    = 'pinned',
@@ -106,8 +117,8 @@ class CondaSetup:
     def __createenv(self):
         "create conda environment"
         if self.__run('list -n '+ self.envname):
-            version = requirements('python', 'numpy')
-            pyvers  = '.'.join(str(requirements('python', 'python')).split('.')[:2])
+            version = self.reqs('python', 'numpy')
+            pyvers  = '.'.join(str(self.reqs('python', 'python')).split('.')[:2])
             cmd     = f'create --yes -n {self.envname} python={pyvers} numpy>={version}'
             if self.__ismin('numpy'):
                 cmd = cmd.replace('>=', '=')
@@ -198,9 +209,9 @@ class CondaSetup:
     def __python_run(self):
         "Installs python modules"
         res  = self.__currentlist()
-        itms = requirements('python', runtimeonly = self.rtime)
+        itms = self.reqs('python', runtimeonly = self.rtime)
         itms.update((i[len('python_'):], j)
-                    for i, j in requirements('cpp', runtimeonly = self.rtime).items()
+                    for i, j in self.reqs('cpp', runtimeonly = self.rtime).items()
                     if i.startswith('python_'))
 
         boost = Boost.getlibs()
@@ -243,7 +254,7 @@ class CondaSetup:
 
     def __coffee_run(self):
         "Installs coffee/js modules"
-        itms  = requirements('coffee', runtimeonly = self.rtime)
+        itms  = self.reqs('coffee', runtimeonly = self.rtime)
         if len(self.packages):
             itms = {i: j for i, j in itms.items() if i in self.packages}
 
@@ -284,9 +295,9 @@ class CondaSetup:
 
     def copyenv(self):
         "copies a environment"
-        req = requirements('python', runtimeonly = self.rtime)
+        req = self.reqs('python', runtimeonly = self.rtime)
         req.update((i[len('python_'):], j)
-                   for i, j in requirements('cpp', runtimeonly = self.rtime).items()
+                   for i, j in self.reqs('cpp', runtimeonly = self.rtime).items()
                    if i.startswith('python_'))
 
         cur  = self.__currentlist()
@@ -327,11 +338,16 @@ class CondaSetup:
 
 def condasetup(cnf:Context = None, **kwa):
     "installs / updates a conda environment"
-    cset = CondaSetup(cnf.options, conda = cnf.env['CONDA'], **kwa)
-    if cset.copy is None:
-        cset.run()
-    else:
-        cset.copyenv()
+    for reqs in (
+            (requirements, suggested)
+            if getattr(cnf.options, 'suggested', False) else
+            (requirements,)
+    ):
+        cset = CondaSetup(cnf.options, conda = cnf.env['CONDA'], required = reqs, **kwa)
+        if cset.copy is None:
+            cset.run()
+        else:
+            cset.copyenv()
 
 def condaenv(name, reqs = None, stream = None):
     "creates a conda yaml file"

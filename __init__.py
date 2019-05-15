@@ -11,7 +11,7 @@ from waflib.Build   import BuildContext
 from waflib.Configure       import conf
 
 from ._defaults     import wscripted, defaultwscript
-from ._requirements import REQ as requirements
+from ._requirements import REQ as requirements, OPT as suggested
 from ._utils        import (addmissing, appname, appdir, copyfiles,
                             runall, patch, getlocals, copyroot, FILTERS)
 from ._python       import (
@@ -170,4 +170,5 @@ def configure(cnf:Context):
 
 __builtins__['make']    = make                  # type: ignore
 __builtins__['require'] = requirements.require  # type: ignore
+__builtins__['suggest'] = suggested.require     # type: ignore
 __builtins__['patch']   = patch                 # type: ignore
