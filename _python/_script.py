@@ -58,8 +58,15 @@ def buildpymod(bld:Context, name:str, pysrc:Sequence, doremove = True, **kwargs)
     if getattr(bld.options, 'APP_PATH', None) is None:
         if doremove:
             removeunknowns(bld, name)
-        bld(name = str(bld.path)+":py", features = "py", source = pysrc)
-
+        root = Path(str(bld.run_dir)).stem+"/"
+        bld(
+            name         = str(bld.path)+":py",
+            features     = "py",
+            source       = pysrc,
+            install_path = '${PYTHONARCHDIR}/'+root+(name if pysrc else '')
+        )
+    if 'Install' in type(bld).__name__:
+        return
     srclist:  List[tuple] = []
     testlist: List[tuple] = []
 
@@ -93,6 +100,8 @@ def build_python(bld:Context, name:str, version:str, **kwargs):
     pysrc   = bld.path.ant_glob('**/*.py')
     buildpyext(bld, name, version, pysrc, csrc, **kwargs)
     buildpymod(bld, name, pysrc, **kwargs)
+    if 'Install' in type(bld).__name__:
+        return
     copyfiles(bld,  name, bld.path.ant_glob('**/*.ipynb'))
 
 @runall

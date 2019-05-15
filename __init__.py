@@ -150,15 +150,16 @@ def build_python_version_file(bld:Context):
     else:
         target = Path(str(bld.options.APP_PATH)).stem+'/version.py'
 
-    bld(features = 'subst',
-        source   = bld.srcnode.find_resource(__package__+'/_version.template'),
-        target   = target,
-        name     = str(bld.path)+":version",
-        version  = version(),
-        lasthash = lasthash(),
-        lastdate = lastdate(),
-        isdirty  = isdirty(),
-        timestamp= lasttimestamp(),
+    bld(features          = 'subst',
+        source            = bld.srcnode.find_resource(__package__+'/_version.template'),
+        target            = target,
+        name              = str(bld.path)+":version",
+        version           = version(),
+        lasthash          = lasthash(),
+        lastdate          = lastdate(),
+        isdirty           = isdirty(),
+        timestamp         = lasttimestamp(),
+        install_path      = '${PYTHONARCHDIR}/'+Path(str(bld.run_dir)).stem,
         cpp_compiler_name = bld.cpp_compiler_name())
 
 addmissing(locals())

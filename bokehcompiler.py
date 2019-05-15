@@ -118,13 +118,15 @@ class GuiMaker:
         tgt  = copyroot(bld, key+'.js')
 
         rule = f'{bld.env["PYTHON"][0]} {__file__} '+' '.join(modules)+' -o ${TGT} -k '+key
-        bld(source      = srcs,
-            name        = modules[0]+':bokeh',
-            color       = 'BLUE',
-            rule        = rule,
-            target      = tgt,
-            cls_keyword = lambda _: 'Bokeh',
-            group       = 'bokeh')
+        root = Path(str(bld.run_dir)).stem+"/"
+        bld(source       = srcs,
+            name         = modules[0]+':bokeh',
+            color        = 'BLUE',
+            rule         = rule,
+            target       = tgt,
+            cls_keyword  = lambda _: 'Bokeh',
+            install_path = '${PYTHONARCHDIR}/'+root,
+            group        = 'bokeh')
 
     @staticmethod
     def build_doc(bld, scriptname, path = 'doc'):
@@ -146,13 +148,20 @@ class GuiMaker:
             + f" -D master_doc={scriptname} -D project={scriptname} -q"
         )
 
+        tgt = bld.path.find_or_declare(target+f'/{scriptname}.html')
         bld(
             rule   = rule,
             source = (
                 bld.srcnode.ant_glob(f'{path}/{scriptname}/*.rst')
                 + bld.srcnode.ant_glob(path+'/conf.py')
             ),
-            target = bld.path.find_or_declare(target+f'/{scriptname}.html')
+            target = tgt
+        )
+        bld.install_files(
+            '${PYTHONARCHDIR}/'+Path(str(bld.run_dir)).stem+"/doc",
+            tgt.parent.ant_glob("**/*.*"),
+            cwd            = tgt.parent,
+            relative_trick = True
         )
 
     @classmethod

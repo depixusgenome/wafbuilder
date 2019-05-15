@@ -37,6 +37,8 @@ class Linting:
         "builds tasks for checking code"
         if bld.options.DO_PY_LINTING is False or len(items) == 0:
             return
+        if 'Install' in type(bld).__name__:
+            return
 
         deps  = cls.__make_deps(bld, name, items)
         rules = cls.__make_rules(bld, deps, discards)

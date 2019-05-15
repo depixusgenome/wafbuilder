@@ -46,7 +46,7 @@ class CondaSetup: # pylint: disable=too-many-instance-attributes
         env = getattr(cnf.options, 'condaenv', 'root')
         if env == 'root':
             env = os.environ.get('CONDA_DEFAULT_ENV', 'base')
-        cnf.env.append_value('CONDA_DEFAULT_ENV', env)
+        cnf.env.CONDA_DEFAULT_ENV = env
         cnf.find_program("conda", var="CONDA", mandatory=True)
 
     @staticmethod
