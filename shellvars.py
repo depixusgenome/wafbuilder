@@ -84,8 +84,23 @@ def info():
     print("\nCONDA PACKAGES *********************")
     subprocess.check_call(['conda', 'list', '--explicit'], shell = False)
 
-def shell(cnf, output = 'stdout', **kwa):
-    "return pythone shell vars to update"
+def shell(cnf, output = 'stdout', shells =  ('build', 'configure', 'test'), **kwa):
+    """
+    updates python shell vars to update
+
+    Arguments:
+        * cnf: can be a list such as sys.argv or a Context
+        * output: governs the behaviour of the method:
+            * 'stdout': prints a shell script to stdout
+            * None:
+                * if 'shellvars' is in the 'cnf' argument: prints a shell
+                script to stdout and terminates the program.
+                * if 'info' is in the 'cnf' argument: sets the shell vars,
+                prints all conda info to stdout and terminates the program.
+                * if any of 'shells' is in the 'cnf' argument:
+                sets the shell vars and returns.
+        * shells: see 'output'
+    """
     if output is None:
         if 'shellvars' in cnf:
             shell(cnf, 'stdout', **kwa)
@@ -95,7 +110,7 @@ def shell(cnf, output = 'stdout', **kwa):
             info()
             exit(0)
 
-        elif 'build' in cnf or 'configure' in cnf:
+        elif any(i in cnf for i in shells):
             try:
                 return shell(cnf, 'shell', **kwa)
             except KeyError:

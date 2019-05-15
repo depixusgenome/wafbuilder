@@ -76,6 +76,9 @@ class PyTesting:
         import os
         from   pathlib   import Path
         from   importlib import import_module
+        from   logging   import getLogger
+        getLogger('test').warning("Using CONDA_DEFAULT_ENV: %s", os.environ['CONDA_DEFAULT_ENV'])
+        getLogger('test').warning("Path to os module: %s", os.__file__)
         os.chdir("build")
         opt = bld.options
         if opt.TEST_HEADLESS:
