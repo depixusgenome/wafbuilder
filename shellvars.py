@@ -31,7 +31,7 @@ def getenvname(cnf, **kwa):
         envname = branch()
     return envname
 
-def shellvars(cnf, **kwa)-> Tuple[Tuple[str, str]]:
+def shellvars(cnf, master = None, **kwa)-> Tuple[Tuple[str, str]]:
     "return a script for setting the path"
     envname = getenvname(cnf, **kwa)
     if envname in ('root', 'base'):
@@ -56,14 +56,19 @@ def shellvars(cnf, **kwa)-> Tuple[Tuple[str, str]]:
         )
     }
 
-    if envname not in avail:
-        raise KeyError(f"Missing conda env '{envname}'")
+    if envname not in avail and master in avail:
+        # use the master env
+        envname = master
+
+    if envname not in avail or envname in ('base', 'root'):
+        # use the base env
+        return ()
 
     return (
         ('CONDA_DEFAULT_ENV', envname),
         ('CONDA_PREFIX',      avail[envname]),
         ('PYTHON_HOST_PROG',  avail[envname]+'/bin/python'),
-        ('PYTHON3_HOST_PROG',  avail[envname]+'/bin/python3'),
+        ('PYTHON3_HOST_PROG', avail[envname]+'/bin/python3'),
         ('PATH',              f'{avail[envname]}/bin:{os.environ["PATH"]}')
     )
 
