@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 # encoding: utf-8
-"The list of modules"
+"""
+Allows using a modulal (plug-in type) hierarchy in waf scripts.
+In general, one will have a parent waf scripts and directies where to put
+the modules. A call to *globalmake* in the parent script will set things up
+automatically
+"""
 from   pathlib          import Path
 from   contextlib       import contextmanager
 
