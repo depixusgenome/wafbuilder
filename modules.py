@@ -114,7 +114,7 @@ class Modules:
 
     def simple(self, cachepath = 'build/'):
         "simple config"
-        class _CondaEnvName(basecontext(cachepath)):
+        class _CondaEnvName(BuildContext):
             fun = cmd = 'condaenvname'
         class _Requirements(basecontext(cachepath)):
             fun = cmd = 'requirements'

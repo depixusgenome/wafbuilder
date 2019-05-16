@@ -11,10 +11,10 @@ try:
 except ImportError:
     from git import branch
 
-def getenvname(cnf, **kwa):
+def condaenvname(cnf, **kwa):
     "get the env name"
-    envname = 'base'
     if isinstance(cnf, (list, tuple)):
+        envname = 'unspecified'
         if '-e' in cnf:
             envname = cnf[cnf.index('-e')+1]
         elif '--envname' in cnf:
@@ -22,10 +22,15 @@ def getenvname(cnf, **kwa):
         else:
             envname = next(
                 (k.split('=')[1] for k in cnf if k.startswith('--envname=')),
-                'base'
+                'unspecified'
             )
     else:
-        envname = kwa.get('envname', getattr(getattr(cnf, 'options', cnf), 'condaenv', 'base'))
+        envname = kwa.get('envname', 'root')
+        if envname == 'root':
+            envname = getattr(getattr(cnf, 'options', cnf), 'condaenv', 'root')
+        if envname == 'root':
+            envname = getattr(getattr(cnf, 'env', cnf), 'CONDA_DEFAULT_ENV', 'base')
+        print(envname)
 
     if envname.lower() == 'branch':
         envname = branch()
@@ -33,7 +38,10 @@ def getenvname(cnf, **kwa):
 
 def shellvars(cnf, master = None, **kwa)-> Tuple[Tuple[str, str]]:
     "return a script for setting the path"
-    envname = getenvname(cnf, **kwa)
+    envname = condaenvname(cnf, **kwa)
+    if envname == 'unspecified':
+        envname = 'base'
+
     if envname in ('root', 'base'):
         return ()
 
@@ -102,6 +110,8 @@ def shell(cnf, output = 'stdout', shells =  ('build', 'configure', 'test'), **kw
         * shells: see 'output'
     """
     if output is None:
+        if 'condaenvname' in cnf:
+            return ''
         if 'shellvars' in cnf:
             shell(cnf, 'stdout', **kwa)
             exit(0)
@@ -112,6 +122,16 @@ def shell(cnf, output = 'stdout', shells =  ('build', 'configure', 'test'), **kw
 
         elif any(i in cnf for i in shells):
             try:
+                envname = condaenvname(cnf, **kwa)
+                if envname == 'unspecified':
+                    envname = (
+                        subprocess
+                        .check_output([sys.executable, *cnf[:cnf.index("waf")+1], "condaenvname"])
+                        .decode('utf-8')
+                        .split('\n')[1]
+                        .strip()
+                    )
+                    cnf = list(cnf)+["-e", envname]
                 return shell(cnf, 'shell', **kwa)
             except KeyError:
                 return ""
