@@ -1,6 +1,18 @@
 #l!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-u"Conda shell vars"
+"""
+Allows defining the conda environment to use.
+
+This is used by 'call_waf.py' in order to set-up the env prior to launching
+the waf script in a child process. In this way the environment variables are
+set from the start of the *true* script.
+
+The environment settings, required for the CI, are also printed-out using the
+*info* method.
+
+Finally, "condaenvname" allows extracting the conda env defined at configuration
+and re-use it *build* and *test* modes.
+"""
 import os
 import sys
 import subprocess
