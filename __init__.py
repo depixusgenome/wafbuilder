@@ -169,7 +169,14 @@ def configure(cnf:Context):
     u"Default configure"
     requirements.check(cnf)
 
-__builtins__['make']    = make                  # type: ignore
-__builtins__['require'] = requirements.require  # type: ignore
-__builtins__['suggest'] = suggested.require     # type: ignore
-__builtins__['patch']   = patch                 # type: ignore
+# pylint: disable=invalid-name
+make    = make                  # type: ignore
+require = requirements.require  # type: ignore
+suggest = suggested.require     # type: ignore
+
+__builtins__.update(
+    make    = make,    # type: ignore
+    require = require, # type: ignore
+    suggest = suggest, # type: ignore
+    patch   = patch    # type: ignore
+)

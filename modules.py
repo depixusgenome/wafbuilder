@@ -9,7 +9,7 @@ from   waflib.Configure import ConfigurationContext
 
 import wafbuilder
 
-def basecontext(bld):
+def basecontext(bld = "../build"):
     "returns the base context"
     return BuildContext if (Path(bld)/'c4che').exists() else ConfigurationContext
 
@@ -21,7 +21,7 @@ class Modules:
         self._all  = () if singles is None else tuple(i for i in singles if Path(i).exists())
         if src is not None:
             self._all += tuple(wafbuilder.wscripted(src))
-        self._src  = src
+        self._src  = [src] if isinstance(src, str) else list(src)
 
     @staticmethod
     def run_condaenvname(cnf):
@@ -112,7 +112,7 @@ class Modules:
         "simple config"
         cls().addbuild(locs, simple = simple)
 
-    def simple(self, cachepath = 'build/'):
+    def simple(self, cachepath = '../build/'):
         "simple config"
         class _CondaEnvName(BuildContext):
             fun = cmd = 'condaenvname'
@@ -202,3 +202,20 @@ class Modules:
         yield
 
         cnf.recurse(mods)
+
+def globalmake(glob = None, apppackager = False, **kwa):
+    "create a simple global wscript"
+    if glob is None:
+        from ._utils import getlocals
+        glob = getlocals()
+
+    mdl = Modules(**{i: kwa.pop(i) for i in set(kwa) & {'singles', 'src', 'binit'}})
+    glob.update(mdl.simple(**kwa))
+
+    if apppackager:
+        from .apppackager import package
+        glob.update(package(
+            mdl,
+            builder = glob['build'],
+            ctxcls = basecontext(kwa.get('cachepath', '../build'))
+        ))

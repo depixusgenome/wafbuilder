@@ -13,7 +13,9 @@ import py_compile
 from waflib.Build   import BuildContext
 
 from .git           import version
+from .modules       import basecontext
 from ._python       import condaenv as _condaenv, condasetup as _condasetup
+from ._utils        import getlocals
 
 class AppPackager(BuildContext):
     "Context for packaging an app"
@@ -160,10 +162,17 @@ class AppPackager(BuildContext):
         self.add_group()
         self(rule = lambda _: self.__final(mods), always = True)
 
-def package(ctxcls, modules, builder, **kwa):
+def package(modules, builder = None, ctxcls = None, **kwa):
     """
     add app packaging functions
     """
+    if ctxcls is None:
+        ctxcls = basecontext()
+    elif isinstance(ctxcls, str):
+        ctxcls = basecontext(ctxcls)
+    if builder is None:
+        builder = getlocals()['build']
+
     funcs       = lambda x, **y: dict({"fun": x, "cmd": x}, **y)
     _CondaEnv   = type('_CondaEnv', (BuildContext,),  funcs('condaenv'))
     _CondaSetup = type('_CondaSetup', (ctxcls,),      funcs('setup'))

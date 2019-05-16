@@ -28,13 +28,19 @@ A number of warning flags are set automatically. See '_cpp.py'.
 
 ### C++
 *openmp* is detected automatically.
-*cppx14* is used automatically.
+*cppx17* is used automatically.
 
-### Coffeescript
-Compilation is performed automatically provided the extension used is '.coffee'.
-The output has the extension '.js'. The '.coffee' file is also copied together
-with the '.py' files. In order to activate the coffeescript support,
-one must define it in the list of builders (see wscript file description).
+### NodeJS
+
+Files with the '.ts' (typescript) or '.coffee' are automatically copied to the build directory.
+This can be done without adding 'nodejs' to requirements.
+
+#### Coffeescript
+Compilation and linting is performed automatically provided the extension used
+is '.coffee' and the wscrip is configured so: see Coffeescript support lower down.
+
+#### Typescript
+No linting or compiling is provided: it is not mandatory to add a requirement.
 
 
 ### Python modules
@@ -81,15 +87,32 @@ require('cpp', 'g++', 5.6, False)
 
 # provide one a list of package names with the same version for all
 require('cpp', ('boost_math', 'boost_accumulators'),  1.60, False)
+
+# Make a suggestion to the user:
+suggest(sphynx = 2.0, rtime = False)
 ~~~
 
 ### When using a conda environment
-Using a project-specific conda environment is a swell idea. Obtaining the list of external libraries for python
-is then as simple as:
+
+Using a project-specific conda environment is a swell idea. This can be done
+automatically as follows:
 ~~~
-conda activate my_python_project_env
-conda list
+python waf setup -e MYCONDAENVNAME     # create the env
+python waf configure -e MYCONDAENVNAME # configure *using* the new env
+python waf build                       # build *using* the new env
+python waf test                        # test *using* the new env
 ~~~
+
+One can use MYCONDAENVNAME="branch" to have the current branch name automatically used.
+
+It can be more convienient to create a new env from an old one and then only change specific packages.
+~~~
+conda create -n NEWENV --clone OLDENV
+conda install bokeh=5.0 -c conda-forge
+...
+~~~
+
+### Creating a conda environment
 
 # The wscript file
 
@@ -108,11 +131,11 @@ import wafbuilder as builder
 builder.defaultwscript("src") # all children directories in 'src' have a default wscript
 ~~~
 
-
-## Adding coffeescript support
+## Adding Coffeescript support
 
 The file then looks like:
 ~~~
+require('nodejs', nodejs = 10.0, coffeescript = 2.0)
 make(builders = ['py', 'coffee'])
 ~~~
 
@@ -133,7 +156,7 @@ The following *wscript* will build the sources and tests:
 ~~~
 #!/usr/bin/env python3
 # encoding: utf-8
-import wafbuilder as builder
+import wafbuilder import require, suggest
 
 # add minimum version for c++
 require(cxx    = {'msvc'     : 14.0,
@@ -153,45 +176,8 @@ require(python = {'pybind11' : '2.0.1',
                   'mypy'     : '0.4.4'},
         rtime  = False)
 
-# _ALL: the list of sub-directories
-_ALL = ('tests',) + tuple(builder.wscripted("src"))
-
-def options(opt):
-    u"Needed by waf, simply calls 'options' in sub-directories'
-    builder.options(opt)
-    for item in _ALL:
-        opt.recurse(item)
-
-def configure(cnf):
-    u"Needed by waf, simply calls 'configure' in sub-directories'
-    builder.configure(cnf)
-    for item in _ALL:
-        cnf.recurse(item)
-
-def build(bld):
-    u"""
-    Needed by waf, calls 'options' in sub-directories
-    and detects those using pybind11
-    """
-    builder.configure(bld)
-    builder.findpyext(bld, builder.wscripted('src'))
-    for item in _ALL:
-        bld.recurse(item)
-
-def environment(cnf):
-    u"prints the environment: use commandline 'python3 waf environment'"
-    print(cnf.env)
-
-def condaenv(_):
-    u"prints the conda recipe"
-    builder.condaenv('myprojectname')
-
-def requirements(_):
-    u"prints the project's requirements"
-    builder.requirements()
-
-# the following creates specific build functions for all
-# sub-directories. Do 'python3 waf --help' to see this
-builder.addbuild(_ALL)
+# add default options/configure/build/test
+# and add support for conda envs & app packaging (apppackager = True)
+from wafbuilder.modules import globalmake
+globalmake(apppackager = True)
 ~~~
-

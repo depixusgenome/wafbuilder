@@ -16,6 +16,7 @@ from waflib                 import Logs
 from waflib.Context         import Context
 from .._requirements        import REQ as requirements, OPT as suggested
 from .._cpp                 import Boost
+from ..git                  import branch as _branch
 
 CHANNELS = ['', ' -c conda-forge']
 
@@ -23,6 +24,8 @@ class CondaSetup: # pylint: disable=too-many-instance-attributes
     "installs / updates a conda environment"
     def __init__(self, cnf = None, conda = None, **kwa):
         self.envname  = kwa.get('envname',  getattr(cnf, 'condaenv', 'root'))
+        if self.envname == "branch":
+            self.envname = _branch()
         self.packages = kwa.get('packages', getattr(cnf, 'packages', '').split(','))
         self.reqs     = kwa.get('required', requirements)
         if self.packages == ['']:
@@ -53,41 +56,46 @@ class CondaSetup: # pylint: disable=too-many-instance-attributes
     def options(opt:Context):
         "defines options for conda setup"
         grp = opt.add_option_group('condasetup options')
-        grp.add_option('-e', '--envname',
-                       dest    = 'condaenv',
-                       action  = 'store',
-                       default = 'root',
-                       help    = u"conda environment name")
+        grp.add_option(
+            '-e', '--envname',
+            dest    = 'condaenv',
+            action  = 'store',
+            default = 'root',
+            help    = (
+                "conda environment name: one can use 'branch'"
+                +" to automatically use the current git branch name"
+            )
+        )
 
         grp.add_option('--suggested',
                        dest    = 'suggested',
                        action  = 'store_true',
                        default = False,
-                       help    = u"install suggested modules as well")
+                       help    = "install suggested modules as well")
 
         grp.add_option('--pinned',
                        dest    = 'pinned',
                        action  = 'store',
                        default = '',
-                       help    = u"packages with pinned versions")
+                       help    = "packages with pinned versions")
 
         grp.add_option('-m', '--min-version',
                        dest    = 'minversion',
                        action  = 'store_true',
                        default = False,
-                       help    = u"install requirement minimum versions by default")
+                       help    = "install requirement minimum versions by default")
 
         grp.add_option('-r', '--runtime-only',
                        dest    = 'runtimeonly',
                        action  = 'store_true',
                        default = False,
-                       help    = u"install only runtime modules")
+                       help    = "install only runtime modules")
 
         grp.add_option('-p', '--packages',
                        dest    = 'packages',
                        action  = 'store',
                        default = '',
-                       help    = u"consider only these packages")
+                       help    = "consider only these packages")
 
     def __run(self, cmd):
         try:
@@ -123,6 +131,7 @@ class CondaSetup: # pylint: disable=too-many-instance-attributes
             if self.__ismin('numpy'):
                 cmd = cmd.replace('>=', '=')
 
+            Logs.info(cmd)
             self.__run(cmd)
 
     def __ismin(self, name):
