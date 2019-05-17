@@ -4,12 +4,13 @@ u"Default cpp for waf"
 import sys
 import re
 from   pathlib          import Path
-from typing             import Optional
+from typing             import Optional, List
 from contextlib         import closing
 from distutils.version  import LooseVersion
 from waflib             import Utils
 from waflib.Configure   import conf
 from waflib.Context     import Context
+from waflib.TaskGen     import after_method,feature
 from ._utils            import (YES, runall, addmissing,
                                 Make, copyargs, copyroot, loading)
 from ._requirements     import REQ as requirements
@@ -149,6 +150,7 @@ class Boost(Make):
     @classmethod
     def configure(cls, cnf:Context):
         u"setup configure"
+        cnf.env.append_value('SYS_INCS', 'BOOST')
         libs, vers = cls.getlibs()
         if not len(libs):
             return
@@ -313,4 +315,38 @@ def cpp_compiler_name(cnf:Context):
 
     return cnf.env['COMPILER_CXX']+"-"+str(curr)
 
+if not sys.platform.startswith("win"):
+    @feature('c','cxx','includes')
+    @after_method('apply_incpaths')
+    def apply_sysincpaths(self):
+        "add system args to specific includes"
+        sysitems: List[str] = []
+        for i in self.env.SYS_INCS:
+            itms = getattr(self.env, f'INCLUDES_{i}')
+            if isinstance(itms, (list, tuple)):
+                sysitems.extend(itms)
+            else:
+                sysitems.append(itms)
+
+        cwd      = self.get_cwd()
+        sysitems = [ str(self.bld.root.make_node(i).path_from(cwd)) for i in sysitems]
+
+        self.env.INCPATHS= [
+            str(x)
+            for x in self.env.INCPATHS
+        ]
+
+        self.env.INCPATHS= [
+            ('SYSTEM' if x in sysitems else '') + x
+            for x in self.env.INCPATHS
+        ]
+
+    from waflib.Task import Task
+    def exec_command(self,cmd, __old__ = Task.exec_command, **kw):
+        "execute cmd"
+        old = list(cmd)
+        cmd.clear()
+        cmd.extend(i.replace('-ISYSTEM', '-isystem') for i in old)
+        return __old__(self, cmd, **kw)
+    Task.exec_command = exec_command
 addmissing(locals())

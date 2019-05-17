@@ -27,6 +27,8 @@ def check_python_nodejs(cnf, _, version):
 @runall
 def configure(cnf:Context):
     "get python headers and modules"
+    cnf.env.append_value('SYS_INCS', 'PYEXT')
+    cnf.env.append_value('SYS_INCS', 'PYEMBED')
     CondaSetup.configure(cnf)
     load(cnf)  # type: ignore # pylint: disable=undefined-variable
 
