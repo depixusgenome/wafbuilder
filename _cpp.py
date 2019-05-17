@@ -344,9 +344,10 @@ if not sys.platform.startswith("win"):
     from waflib.Task import Task
     def exec_command(self,cmd, __old__ = Task.exec_command, **kw):
         "execute cmd"
-        old = list(cmd)
-        cmd.clear()
-        cmd.extend(i.replace('-ISYSTEM', '-isystem') for i in old)
+        if isinstance(cmd, list):
+            old = list(cmd)
+            cmd.clear()
+            cmd.extend(i.replace('-ISYSTEM', '-isystem') for i in old)
         return __old__(self, cmd, **kw)
     Task.exec_command = exec_command
 addmissing(locals())
