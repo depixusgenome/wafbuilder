@@ -156,7 +156,7 @@ The following *wscript* will build the sources and tests:
 ~~~
 #!/usr/bin/env python3
 # encoding: utf-8
-import wafbuilder import require, suggest
+from wafbuilder import require, suggest
 
 # add minimum version for c++
 require(cxx    = {'msvc'     : 14.0,
