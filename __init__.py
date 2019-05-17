@@ -18,17 +18,7 @@ from ._python       import (
     checkpy, findpyext, condaenv, condasetup, CHANNELS,
     PyTesting
 )
-from .git           import version, lasthash, lastdate, isdirty, lasttimestamp
-
-def top()-> str:
-    u"returns top path"
-    path = __file__[:__file__.rfind("/")]
-    path = path    [:path       .rfind("/")]
-    return path+"/"
-
-def output() -> str:
-    u"returns build path"
-    return top() + "/build"
+from .git           import version
 
 def register(name:str, fcn:Callable[[Context], None], glob:dict):
     u"Registers a *build* command for building a single module"
@@ -59,7 +49,7 @@ def addbuild(name:str, glob:Optional[dict] = None):
 
     def _doc(path):
         if not os.path.exists(path):
-            return
+            return None
         with open(path, "r") as stream:
             bnext = False
             for line in stream:
@@ -117,8 +107,6 @@ def make(glob = None, **kw):
     # pylint: disable=unnecessary-lambda
     toadd = dict(VERSION   = lambda: version(appdir()),
                  APPNAME   = lambda: appname(),
-                 top       = lambda: ".",
-                 out       = lambda: output(),
                  options   = lambda: options,
                  configure = lambda: configure,
                  build     = lambda: build)
@@ -141,26 +129,6 @@ def recurse(builder, items):
                 bld.recurse(item)
         return _wrap
     return _wrapper
-
-@conf
-def build_python_version_file(bld:Context):
-    "creates a version.py file"
-    if getattr(bld.options, 'APP_PATH', None) is None:
-        target = 'version.py'
-    else:
-        target = Path(str(bld.options.APP_PATH)).stem+'/version.py'
-
-    bld(features          = 'subst',
-        source            = bld.srcnode.find_resource(__package__+'/_version.template'),
-        target            = target,
-        name              = str(bld.path)+":version",
-        version           = version(),
-        lasthash          = lasthash(),
-        lastdate          = lastdate(),
-        isdirty           = isdirty(),
-        timestamp         = lasttimestamp(),
-        install_path      = '${PYTHONARCHDIR}/'+Path(str(bld.run_dir)).stem,
-        cpp_compiler_name = bld.cpp_compiler_name())
 
 addmissing(locals())
 

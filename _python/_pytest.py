@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "All python-testing related details"
-def _run(cov, args):
-    from   importlib import import_module
-    import_module(cov).main(args)
+import os
+from   pathlib   import Path
+from   importlib import import_module
 
 class PyTesting:
     "All python-testing related details"
@@ -73,16 +73,13 @@ class PyTesting:
     @classmethod
     def test(cls, bld):
         "do unit tests"
-        import os
-        from   pathlib   import Path
-        from   importlib import import_module
         from   waflib.Logs   import info
         info(
             "Using CONDA_DEFAULT_ENV: %s",
             os.environ.get('CONDA_DEFAULT_ENV', '-')
         )
         info("Path to os module: %s", os.__file__)
-        os.chdir("build")
+        os.chdir(str(bld.bldnode))
         opt = bld.options
         if opt.TEST_HEADLESS:
             os.environ['DPX_TEST_HEADLESS'] = 'True'
@@ -103,11 +100,8 @@ class PyTesting:
     @classmethod
     def html(cls, bld):
         "create the html"
-        import os
-        from   pathlib   import Path
-        from   importlib import import_module
         from   waflib.Logs   import info
-        os.chdir("build")
+        os.chdir(str(bld.bldnode))
         opt  = bld.options
         gcda = any(Path(".").glob("./**/*.gcda"))
         info("Found gcda files at %s: %s", Path(".").resolve(), gcda)
@@ -133,7 +127,7 @@ class PyTesting:
     @classmethod
     def __lcov(cls, bld):
         "create lcov report"
-        cwd = "build"
+        cwd = Path(str(bld.bldnode)).stem
         opt = bld.options
         bld.cmd_and_log(
             cls.CAPTURE.format(output = "cppcoverage.info"),

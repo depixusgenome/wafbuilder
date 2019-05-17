@@ -8,6 +8,7 @@ automatically
 """
 from   pathlib          import Path
 from   contextlib       import contextmanager
+from   typing           import Optional
 
 from   waflib.Build     import BuildContext
 from   waflib.Configure import ConfigurationContext
@@ -70,14 +71,13 @@ class Modules:
         mods  = ('/'+i.split('/')[-1] for i in self(bld))
         names = (path for path in bld.path.ant_glob((root+'/*test.py', root+'/*/*test.py')))
         names = (str(name) for name in names if any(i in str(name) for i in mods))
-        wafbuilder.runtest(bld, *(name[name.rfind('tests'):] for name in names))
+        getattr(wafbuilder, 'runtest')(bld, *(name[name.rfind('tests'):] for name in names))
 
     def run_build(self, bld, mods = None):
         "compile sources"
         if mods is None:
             mods = self(bld)
         bld.build_python_version_file()
-        print("<", mods, wafbuilder.build)
         wafbuilder.build(bld) # pylint: disable=no-member
         wafbuilder.findpyext(bld, set(mod for mod in mods if mod != 'tests'))
         bld.recurse(mods, 'build')
@@ -131,7 +131,7 @@ class Modules:
         "simple config"
         cls().addbuild(locs, simple = simple)
 
-    def simple(self, cachepath = 'build/'):
+    def simple(self, cachepath: Optional[str] = None):
         "simple config"
         class _CondaEnvName(basecontext()):
             fun = cmd = 'condaenvname'

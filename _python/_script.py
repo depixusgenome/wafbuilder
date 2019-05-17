@@ -5,6 +5,9 @@ from pathlib            import Path
 from typing             import Sequence, List
 from waflib.Configure   import conf
 from waflib.Context     import Context
+from ..git              import (
+    version as _version,  lasthash, lastdate, isdirty, lasttimestamp
+)
 from .._utils           import YES, runall, addmissing, copyfiles, copyroot
 from .._requirements    import REQ as requirements
 
@@ -99,6 +102,26 @@ def build_python(bld:Context, name:str, version:str, **kwargs):
     if 'Install' in type(bld).__name__:
         return
     copyfiles(bld,  name, bld.path.ant_glob('**/*.ipynb'))
+
+@conf
+def build_python_version_file(bld:Context):
+    "creates a version.py file"
+    if getattr(bld.options, 'APP_PATH', None) is None:
+        target = 'version.py'
+    else:
+        target = Path(str(bld.options.APP_PATH)).stem+'/version.py'
+
+    bld(features          = 'subst',
+        source            = bld.srcnode.find_resource(__package__+'/_version.template'),
+        target            = target,
+        name              = str(bld.path)+":version",
+        version           = _version(),
+        lasthash          = lasthash(),
+        lastdate          = lastdate(),
+        isdirty           = isdirty(),
+        timestamp         = lasttimestamp(),
+        install_path      = '${PYTHONARCHDIR}/'+Path(str(bld.run_dir)).stem,
+        cpp_compiler_name = bld.cpp_compiler_name())
 
 @runall
 def options(opt:Context):
