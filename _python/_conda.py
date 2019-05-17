@@ -35,7 +35,7 @@ class CondaSetup: # pylint: disable=too-many-instance-attributes
         self.rtime   = kwa.get('runtimeonly', getattr(cnf, 'runtimeonly', False))
         self.copy    = kwa.get('copy', None)
 
-        if getattr(cnf, 'pinned', '') == '':
+        if getattr(cnf, 'pinned', None):
             lst = self.reqs.pinned()
             lst.extend(i.replace('python-', '') for i in lst if 'python-' in i)
         else:
