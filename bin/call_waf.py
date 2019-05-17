@@ -6,18 +6,14 @@ import  subprocess
 from    importlib import import_module
 from    pathlib   import Path
 
-FNAME = Path.cwd()/"wafbuilder"/"bin"/"waf"
-if not FNAME.exists():
-    raise IOError(
-        "Missing wafbuilder: do\n"
-        +"    git submodules update --init --recursive\n"
-    )
-
-sys.path.insert(0, "./wafbuilder")
+sys.path.insert(0, str(Path(__file__).parent.parent))
 import_module("shellvars").shell(sys.argv, None)
+sys.path.pop(0)
 
-ARGS = tuple(sys.argv)[2 if 'python' in sys.argv[0] else 1:]
-if sys.platform.startswith('win'):
-    subprocess.run([str(FNAME.with_suffix(".bat"))] + list(ARGS))
-else:
-    subprocess.run([str(FNAME)] + list(ARGS))
+ARGS  = tuple(sys.argv)[2 if 'python' in sys.argv[0] else 1:]
+FNAME = str(
+    (
+        Path(__file__).parent/"waf"
+    ).with_suffix(".bat" if sys.platform.startswith('win') else "")
+)
+subprocess.run([FNAME, *ARGS])
