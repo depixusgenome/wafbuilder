@@ -14,7 +14,7 @@ from   waflib.Configure import ConfigurationContext
 
 import wafbuilder
 
-def basecontext(bld = "../build"):
+def basecontext(bld = "build"):
     "returns the base context"
     return BuildContext if (Path(bld)/'c4che').exists() else ConfigurationContext
 
@@ -117,9 +117,9 @@ class Modules:
         "simple config"
         cls().addbuild(locs, simple = simple)
 
-    def simple(self, cachepath = '../build/'):
+    def simple(self, cachepath = 'build/'):
         "simple config"
-        class _CondaEnvName(BuildContext):
+        class _CondaEnvName(basecontext(cachepath)):
             fun = cmd = 'condaenvname'
         class _Requirements(basecontext(cachepath)):
             fun = cmd = 'requirements'
@@ -222,5 +222,5 @@ def globalmake(glob = None, apppackager = False, **kwa):
         glob.update(package(
             mdl,
             builder = glob['build'],
-            ctxcls = basecontext(kwa.get('cachepath', '../build'))
+            ctxcls = basecontext(kwa.get('cachepath', 'build'))
         ))

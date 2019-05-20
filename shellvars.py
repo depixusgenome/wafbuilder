@@ -23,6 +23,15 @@ try:
 except ImportError:
     from git import branch
 
+def _envnames(cnf):
+    return (
+        subprocess
+        .run(cnf, check = True, stdout = subprocess.PIPE, stderr = subprocess.PIPE).stdout
+        .decode('utf-8')
+        .strip()
+        .split('\n')
+    )
+
 def condaenvname(cnf, **kwa):
     "get the env name"
     if isinstance(cnf, (list, tuple)):
@@ -68,12 +77,7 @@ def shellvars(cnf, master = None, **kwa)-> Tuple[Tuple[str, str]]:
     conda = kwa.get('conda', getattr(cnf, 'env', {}).get('CONDA', 'conda'))
     avail = {
         i.strip()[:i.find(' ')]: i.strip()[i.rfind(' ')+1:]
-        for i in (
-            subprocess
-            .check_output([conda, 'info', '-e'])
-            .decode('utf-8')
-            .split('\n')
-        )
+        for i in _envnames([conda, 'info', '-e'])
     }
 
     if envname not in avail and master in avail:
@@ -136,13 +140,11 @@ def shell(cnf, output = 'stdout', shells =  ('build', 'configure', 'test'), **kw
             try:
                 envname = condaenvname(cnf, **kwa)
                 if envname == 'unspecified':
-                    envname = (
-                        subprocess
-                        .check_output([sys.executable, *cnf[:cnf.index("waf")+1], "condaenvname"])
-                        .decode('utf-8')
-                        .split('\n')[1]
-                        .strip()
-                    )
+                    elems = _envnames([sys.executable, *cnf[:cnf.index("waf")+1], "condaenvname"])
+                    if len(elems) > 1:
+                        envname = elems[1].strip()
+                    else:
+                        envname = "base"
                     cnf = list(cnf)+["-e", envname]
                 return shell(cnf, 'shell', **kwa)
             except KeyError:
