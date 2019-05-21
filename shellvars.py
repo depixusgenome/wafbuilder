@@ -21,7 +21,7 @@ from typing         import Tuple
 try:
     from .git       import branch
 except ImportError:
-    from git import branch
+    from git        import branch
 
 def _envnames(cnf):
     return (
@@ -32,7 +32,10 @@ def _envnames(cnf):
         .split('\n')
     )
 
-def condaenvname(cnf, **kwa):
+ENV_DEFAULT = "master"
+ENV_BASE    = "base"
+ENV_BRANCH  = "base"
+def condaenvname(cnf, default = ENV_BRANCH, **kwa):
     "get the env name"
     if isinstance(cnf, (list, tuple)):
         envname = 'unspecified'
@@ -46,32 +49,22 @@ def condaenvname(cnf, **kwa):
                 'unspecified'
             )
     else:
-        envname = kwa.get('envname', 'root')
-        if envname == 'root':
-            envname = getattr(getattr(cnf, 'options', cnf), 'condaenv', 'root')
-        if envname == 'root':
-            envname = getattr(getattr(cnf, 'env', cnf), 'CONDA_DEFAULT_ENV', 'base')
-        if isinstance(envname, list):
-            envname = "root"
+        get     = lambda x, y: getattr(getattr(cnf, x, cnf), y, None)
+        envname = kwa.get('envname', None)
+        if not envname:
+            envname = get('options', 'condaenv')
+        if not envname:
+            envname = get('env', 'CONDA_DEFAULT_ENV')
+        if not envname:
+            envname = default
 
-    if envname.lower() == 'branch':
+    if envname.lower() == ENV_BRANCH:
         envname = branch()
     return envname
 
-def shellvars(cnf, master = None, **kwa)-> Tuple[Tuple[str, str]]:
+def shellvars(cnf, default = ENV_BRANCH, **kwa)-> Tuple[Tuple[str, str]]:
     "return a script for setting the path"
-    envname = condaenvname(cnf, **kwa)
-    if envname == 'unspecified':
-        envname = 'base'
-
-    if envname in ('root', 'base'):
-        return ()
-
-    path  = os.environ.get('PATH', '')
-    cname = os.environ.get('CONDA_DEFAULT_ENV', 'base')
-    if envname in path or envname == cname:
-        return ()
-
+    envname = condaenvname(cnf, default = default, **kwa)
     if sys.platform.startswith("win"):
         raise NotImplementedError("Needs coding the conda env discovery & setup")
 
@@ -81,13 +74,12 @@ def shellvars(cnf, master = None, **kwa)-> Tuple[Tuple[str, str]]:
         for i in _envnames([conda, 'info', '-e'])
     }
 
-    if envname not in avail and master in avail:
-        # use the master env
-        envname = master
-
-    if envname not in avail or envname in ('base', 'root'):
-        # use the base env
-        return ()
+    if envname not in avail:
+        envname = (
+            default     if default     in avail else
+            ENV_DEFAULT if ENV_DEFAULT in avail else
+            ENV_BASE
+        )
 
     return (
         ('CONDA_DEFAULT_ENV', envname),
