@@ -32,9 +32,9 @@ def _envnames(cnf):
         .split('\n')
     )
 
-ENV_DEFAULT = "master"
 ENV_BASE    = "base"
-ENV_BRANCH  = "base"
+ENV_BRANCH  = "branch"
+ENV_DEFAULT = ENV_BRANCH
 def condaenvname(cnf, default = ENV_BRANCH, **kwa):
     "get the env name"
     if isinstance(cnf, (list, tuple)):
@@ -75,11 +75,17 @@ def shellvars(cnf, default = ENV_BRANCH, **kwa)-> Tuple[Tuple[str, str]]:
     }
 
     if envname not in avail:
-        envname = (
-            default     if default     in avail else
-            ENV_DEFAULT if ENV_DEFAULT in avail else
-            ENV_BASE
-        )
+        envname = default
+        if envname == ENV_BRANCH:
+            envname = branch()
+
+    if envname not in avail:
+        envname = ENV_DEFAULT
+        if envname == ENV_BRANCH:
+            envname = branch()
+
+    if envname not in avail:
+        envname = ENV_BASE
 
     return (
         ('CONDA_DEFAULT_ENV', envname),
@@ -138,7 +144,7 @@ def shell(cnf, output = 'stdout', shells =  ('build', 'configure', 'test'), **kw
                             envname = i.split(":")[1].strip()
                             break
                     else:
-                        envname = "base"
+                        envname = ENV_BRANCH
 
                     cnf = list(cnf)+["-e", envname]
                 return shell(cnf, 'shell', **kwa)

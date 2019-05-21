@@ -46,7 +46,7 @@ class CondaSetup: # pylint: disable=too-many-instance-attributes
     @staticmethod
     def configure(cnf:Context):
         "get conda script"
-        env = getattr(cnf.options, 'condaenv', 'root')
+        env = getattr(cnf.options, 'condaenv', 'base')
         if env == 'root':
             env = os.environ.get('CONDA_DEFAULT_ENV', 'base')
         cnf.env.CONDA_DEFAULT_ENV = env
@@ -55,12 +55,13 @@ class CondaSetup: # pylint: disable=too-many-instance-attributes
     @staticmethod
     def options(opt:Context):
         "defines options for conda setup"
+        from ..shellvars import ENV_DEFAULT
         grp = opt.add_option_group('condasetup options')
         grp.add_option(
             '-e', '--envname',
             dest    = 'condaenv',
             action  = 'store',
-            default = 'root',
+            default = ENV_DEFAULT,
             help    = (
                 "conda environment name: one can use 'branch'"
                 +" to automatically use the current git branch name"
