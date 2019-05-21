@@ -25,7 +25,7 @@ def basecontext():
         env.load(_options.lockfile)
     except: # pylint: disable=bare-except
         return ConfigurationContext
-    return BuildContext if (Path(env.run_dir)/'c4che').exists() else ConfigurationContext
+    return BuildContext if (Path(env.out_dir)/'c4che').exists() else ConfigurationContext
 
 class Modules:
     "sets-up the modules"
