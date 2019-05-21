@@ -162,14 +162,11 @@ class AppPackager(BuildContext):
         self.add_group()
         self(rule = lambda _: self.__final(mods), always = True)
 
-def package(modules, builder = None, ctxcls = None, **kwa):
+def package(modules, builder = None, **kwa):
     """
     add app packaging functions
     """
-    if ctxcls is None:
-        ctxcls = basecontext()
-    elif isinstance(ctxcls, str):
-        ctxcls = basecontext(ctxcls)
+    ctxcls = basecontext()
     if builder is None:
         builder = getlocals()['build']
 

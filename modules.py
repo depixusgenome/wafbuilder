@@ -11,12 +11,21 @@ from   contextlib       import contextmanager
 
 from   waflib.Build     import BuildContext
 from   waflib.Configure import ConfigurationContext
+from   waflib.ConfigSet import ConfigSet
+import waflib.Options   as     _options
 
 import wafbuilder
 
-def basecontext(bld = "build"):
+def basecontext():
     "returns the base context"
-    return BuildContext if (Path(bld)/'c4che').exists() else ConfigurationContext
+    if not Path(_options.lockfile).exists():
+        return ConfigurationContext
+    env = ConfigSet()
+    try:
+        env.load(_options.lockfile)
+    except: # pylint: disable=bare-except
+        return ConfigurationContext
+    return BuildContext if (Path(env.run_dir)/'c4che').exists() else ConfigurationContext
 
 class Modules:
     "sets-up the modules"
@@ -32,7 +41,7 @@ class Modules:
     def run_condaenvname(cnf):
         "prints requirements"
         from wafbuilder.shellvars import condaenvname
-        condaenvname(cnf)
+        print("CONDA_ENV_NAME:", condaenvname(cnf))
 
     def run_requirements(self, cnf):
         "prints requirements"
@@ -119,9 +128,9 @@ class Modules:
 
     def simple(self, cachepath = 'build/'):
         "simple config"
-        class _CondaEnvName(basecontext(cachepath)):
+        class _CondaEnvName(basecontext()):
             fun = cmd = 'condaenvname'
-        class _Requirements(basecontext(cachepath)):
+        class _Requirements(basecontext()):
             fun = cmd = 'requirements'
         class _Test(BuildContext):
             fun = cmd = 'test'
@@ -219,8 +228,4 @@ def globalmake(glob = None, apppackager = False, **kwa):
 
     if apppackager:
         from .apppackager import package
-        glob.update(package(
-            mdl,
-            builder = glob['build'],
-            ctxcls = basecontext(kwa.get('cachepath', 'build'))
-        ))
+        glob.update(package(mdl, builder = glob['build']))

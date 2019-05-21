@@ -51,7 +51,8 @@ def condaenvname(cnf, **kwa):
             envname = getattr(getattr(cnf, 'options', cnf), 'condaenv', 'root')
         if envname == 'root':
             envname = getattr(getattr(cnf, 'env', cnf), 'CONDA_DEFAULT_ENV', 'base')
-        print(envname)
+        if isinstance(envname, list):
+            envname = "root"
 
     if envname.lower() == 'branch':
         envname = branch()
@@ -140,11 +141,13 @@ def shell(cnf, output = 'stdout', shells =  ('build', 'configure', 'test'), **kw
             try:
                 envname = condaenvname(cnf, **kwa)
                 if envname == 'unspecified':
-                    elems = _envnames([sys.executable, *cnf[:cnf.index("waf")+1], "condaenvname"])
-                    if len(elems) > 1:
-                        envname = elems[1].strip()
+                    for i in _envnames([sys.executable, *cnf[:cnf.index("waf")+1], "condaenvname"]):
+                        if i.startswith("CONDA_ENV_NAME:"):
+                            envname = i.split(":")[1].strip()
+                            break
                     else:
                         envname = "base"
+
                     cnf = list(cnf)+["-e", envname]
                 return shell(cnf, 'shell', **kwa)
             except KeyError:
