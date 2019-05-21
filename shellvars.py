@@ -62,9 +62,11 @@ def condaenvname(cnf, default = ENV_BRANCH, **kwa):
         envname = branch()
     return envname
 
-def shellvars(cnf, default = ENV_BRANCH, **kwa)-> Tuple[Tuple[str, str]]:
+def shellvars(cnf, defaults = None, **kwa)-> Tuple[Tuple[str, str]]:
     "return a script for setting the path"
-    envname = condaenvname(cnf, default = default, **kwa)
+    if not defaults:
+        defaults = ENV_DEFAULT
+    envname = condaenvname(cnf, default = defaults[0], **kwa)
     if sys.platform.startswith("win"):
         raise NotImplementedError("Needs coding the conda env discovery & setup")
 
@@ -75,14 +77,14 @@ def shellvars(cnf, default = ENV_BRANCH, **kwa)-> Tuple[Tuple[str, str]]:
     }
 
     if envname not in avail:
-        for i in [default, *ENV_DEFAULT]:
+        for i in defaults:
             envname = i
             if envname == ENV_BRANCH:
                 envname = branch()
             if envname in avail:
                 break
         else:
-            raise KeyError("Missing default env")
+            envname = ENV_BASE
     return (
         ('CONDA_DEFAULT_ENV', envname),
         ('CONDA_PREFIX',      avail[envname]),
