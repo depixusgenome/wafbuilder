@@ -61,7 +61,7 @@ class CondaSetup: # pylint: disable=too-many-instance-attributes
             '-e', '--envname',
             dest    = 'condaenv',
             action  = 'store',
-            default = ENV_DEFAULT,
+            default = ENV_DEFAULT[0],
             help    = (
                 "conda environment name: one can use 'branch'"
                 +" to automatically use the current git branch name"
