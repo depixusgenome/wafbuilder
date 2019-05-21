@@ -63,6 +63,7 @@ class Modules:
 
     def run_configure(self, cnf):
         "configure wafbuilder"
+        cnv.env.MODULE_SOURCE_DIR = list(self._src)
         with self.configure(cnf):
             wafbuilder.configure(cnf)
 
@@ -233,4 +234,4 @@ def globalmake(glob = None, apppackager = False, **kwa):
 
     if apppackager:
         from .apppackager import package
-        glob.update(package(mdl, builder = glob['build']))
+        glob.update(package(mdl))

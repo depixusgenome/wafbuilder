@@ -3,19 +3,22 @@
 "Everything related to conda"
 import sys
 import os
-from pathlib    import Path
-from itertools  import chain
-from zipfile    import ZipFile
-from shutil     import rmtree, copy2, move
-from typing     import List
+from pathlib            import Path
+from itertools          import chain
+from zipfile            import ZipFile
+from shutil             import rmtree, copy2, move
+from typing             import List, Dict, Union
 import py_compile
 
-from waflib.Build   import BuildContext
+from waflib             import TaskGen
+from waflib.Build       import BuildContext
+from waflib.Configure   import conf
 
 from .git           import version
+from .bokehcompiler import build_bokehjs
 from .modules       import basecontext
-from ._python       import condaenv as _condaenv, condasetup as _condasetup
-from ._utils        import getlocals
+from ._python       import condasetup as _condasetup
+from ._utils        import copyfiles
 
 class AppPackager(BuildContext):
     "Context for packaging an app"
@@ -166,47 +169,182 @@ class AppPackager(BuildContext):
         self.add_group()
         self(rule = lambda _: self.__final(mods), always = True)
 
-def package(modules, builder = None, **kwa):
+def build_resources(bld):
+    "install resources in installation directory"
+    files = bld.path.ant_glob([i+"/**/static/*."+j
+                               for j in ("css", "js", "map", "svg", "eot",
+                                         "ttf", "woff")
+                               for i in bld.env.MODULE_SOURCE_DIR])
+    copyfiles(bld, 'static', files)
+    bld.install_files(
+        bld.installpath("static", direct = True),
+        files
+    )
+
+    src = [str(bld.root)+"/"+str(i) for i in bld.env.RESOURCES]
+    if sys.platform.startswith("win"):
+        src = [i for i in src if not i.endswith(".desktop")]
+
+    bld.install_files(
+        bld.installpath(direct = True),
+        src,
+        cwd            = bld.root,
+        relative_trick = True
+    )
+
+def install_condaenv(bld):
+    "install conda env in installation directory"
+    node = Path(str(bld.bldnode.parent))
+    cpy  = Path(str(bld.env.PREFIX)).relative_to(node)
+    _condasetup(bld, copy = str(cpy), runtimeonly = True)
+
+def build_changelog(bld):
+    "build the changelog"
+    chlog = "CHANGELOG.md" if not bld.env.CHANGELOG_PATH else bld.env.CHANGELOG_PATH
+    if Path(chlog).exists():
+        bld(source = [bld.root.find_or_declare(chlog)])
+
+def build_startupscripts(bld, name, scriptname):
+    "creates the startup script"
+    iswin = sys.platform.startswith("win")
+    ext   = ".bat" if iswin else ".sh"
+    args  = dict(
+        features   = "subst",
+        directory  = "code",
+        scriptname = scriptname,
+        target     = "bin/"+name+ext,
+        source     = bld.srcnode.find_resource(f"{__package__}/_exec{ext}")
+        **bld.installpath()
+    )
+    for cmdline in bld.env.table.get('CMDLINES', []):
+        args['cmdline'] = cmdline
+        if iswin:
+            bld(
+                start  = r'start /min',
+                python = r'pythonw',
+                pause  = "",
+                **args
+            )
+            bld(**dict(
+                args,
+                target = "bin"/name+"_debug"+ext,
+                start  = r'',
+                python = r'python',
+                pause  = "pause"
+            ))
+        else:
+            bld(python = r'./bin/python', **args)
+
+def build_doc(bld, scriptname):
+    "create the doc"
+    path = bld.env.table.get('DOCPATH', "doc")
+    if not (
+            'SPHINX_BUILD' in bld.env
+            and (Path(str(bld.srcnode))/path/scriptname).exists()
+    ):
+        return
+    if getattr(bld.options, 'APP_PATH', None) is None:
+        target = str(bld.bldnode)+f"/{path}/"+scriptname
+    else:
+        target = str(bld.options.APP_PATH)+f"/{path}/"+scriptname
+
+    rule = (
+        "${SPHINX_BUILD} "+str(bld.srcnode)+f"/{path}/{scriptname} "
+        +"-c "+str(bld.srcnode)+f"/{path} "
+        +target
+        + f" -D master_doc={scriptname} -D project={scriptname} -q"
+    )
+
+    tgt = bld.path.find_or_declare(target+f'/{scriptname}.html')
+    bld(
+        rule   = rule,
+        source = (
+            bld.srcnode.ant_glob(f'{path}/{scriptname}/*.rst')
+            + bld.srcnode.ant_glob(path+'/conf.py')
+        ),
+        target = tgt
+    )
+    bld.install_files(
+        bld.installpath(path, direct = True),
+        tgt.parent.ant_glob("**/*.*"),
+        cwd            = tgt.parent,
+        relative_trick = True
+    )
+
+def package(modules):
     """
     add app packaging functions
     """
-    ctxcls = basecontext()
-    if builder is None:
-        builder = getlocals()['build']
-
     funcs       = lambda x, **y: dict({"fun": x, "cmd": x}, **y)
-    _CondaEnv   = type('_CondaEnv', (BuildContext,),  funcs('condaenv'))
-    _CondaSetup = type('_CondaSetup', (ctxcls,),      funcs('setup'))
-    _CondaApp   = type('_CondaPatch', (AppPackager,), funcs('app', doall = True, **kwa))
-    _CondaPatch = type('_CondaPatch', (_CondaApp,),   funcs('apppatch', doall = False))
-
-    def condaenv(cnf):
-        u"prints the conda yaml recipe"
-        modules(cnf)
-        _condaenv(getattr(_CondaApp, 'libname'))
+    _CondaSetup = type('_CondaSetup', (basecontext(),),      funcs('setup'))
 
     def setup(cnf):
         "Sets up the python environment"
         modules(cnf)
         _condasetup(cnf)
-        if sys.platform.startswith("win"):
-            print("COFFEESCRIPT is not mandatory & can be installed manually")
+    return dict(_CondaSetup = _CondaSetup, setup = setup)
 
-    def app(bld):
-        "Creates an application"
-        bld.build_app(modules, builder)
+def guimake(viewname, locs, scriptname = None):
+    "default make for a gui"
+    from wafbuilder import make
+    make(locs)
+    def guibuild(cnf, __old__ = locs['build']):
+        "build gui"
+        __old__(cnf)
+        cnf.build_app(locs['APPNAME'], viewname, scriptname)
+    locs["build"] = guibuild
 
-    def apppatch(bld):
-        "Creates an application patch"
-        bld.build_app(modules, builder)
+@conf
+def configure_app(cnf, cmds = (), modules = (), jspaths = (), resources = ()):
+    "configure bokehjs"
+    cnf.find_program("sphinx-build", var="SPHINX_BUILD", mandatory=False)
+    cnf.env.DOCPATH = "doc"
+    cnf.env.ISPATCH = cnf.env.ispatch
+    for i in modules:
+        cnf.env.append_value("BOKEH_DEFAULT_MODULES", i)
 
-    return dict(
-        _CondaEnv   = _CondaEnv,
-        _CondaApp   = _CondaApp,
-        _CondaPatch = _CondaPatch,
-        _CondaSetup = _CondaSetup,
-        setup       = setup,
-        app         = app,
-        apppatch    = apppatch,
-        condaenv    = condaenv
-    )
+    for i in jspaths:
+        cnf.env.append_value("BOKEH_DEFAULT_JS_PATHS", i)
+
+    for i in cmds:
+        cnf.env.append_value("CMDLINES", i)
+
+    for i in resources:
+        cnf.env.append_value("RESOURCES", i)
+
+@conf
+def build_appenv(bld):
+    "install general app stuff"
+    build_resources(bld)
+    build_changelog(bld)
+    bld.build_python_version_file()
+    bld.add_group('bokeh', move = False)
+    if bld.env.ISPATCH or bld.cmd != "install":
+        return
+    install_condaenv(bld)
+
+@conf
+def installpath(*names, direct = False) -> Union[str, Dict[str, str]]:
+    "return the install path"
+    path = '{PREFIX}/'+'/'.join(names)
+    return path if direct else {"install_path": path}
+
+TaskGen.declare_chain(
+    name         = 'markdowns',
+    rule         = '${PANDOC} --toc -s ${SRC} -o ${TGT}',
+    ext_in       = '.md',
+    ext_out      = '.html',
+    shell        = False,
+    reentrant    = False,
+    **installpath()
+)
+
+@conf
+def build_app(bld, appname, viewname, scriptname = None):
+    "build gui"
+    name = appname if scriptname is None else scriptname
+    build_startupscripts(bld, name, appname+'.'+viewname)
+    build_bokehjs(bld, viewname, scriptname)
+    build_doc(bld, scriptname)
+
+__builtins__['guimake'] = guimake # type: ignore

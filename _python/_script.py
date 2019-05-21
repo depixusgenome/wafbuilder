@@ -51,21 +51,18 @@ def removeunknowns(bld:Context, name:str):
 
 def buildpymod(bld:Context, name:str, pysrc:Sequence, doremove = True, **_):
     "builds a python module"
-    if len(pysrc) == 0:
+    if len(pysrc) == 0 or 'Install' in type(bld).__name__:
         return
 
     if getattr(bld.options, 'APP_PATH', None) is None:
         if doremove:
             removeunknowns(bld, name)
-        root = Path(str(bld.run_dir)).stem+"/"
         bld(
             name         = str(bld.path)+":py",
             features     = "py",
             source       = pysrc,
-            install_path = '${PYTHONARCHDIR}/'+root+(name if pysrc else '')
+            **bld.installpath("code", name if pysrc else "")
         )
-    if 'Install' in type(bld).__name__:
-        return
     srclist:  List[tuple] = []
     testlist: List[tuple] = []
 
@@ -106,22 +103,19 @@ def build_python(bld:Context, name:str, version:str, **kwargs):
 @conf
 def build_python_version_file(bld:Context):
     "creates a version.py file"
-    if getattr(bld.options, 'APP_PATH', None) is None:
-        target = 'version.py'
-    else:
-        target = Path(str(bld.options.APP_PATH)).stem+'/version.py'
-
-    bld(features          = 'subst',
+    bld(
+        features          = 'subst',
         source            = bld.srcnode.find_resource(__package__+'/_version.template'),
-        target            = target,
+        target            = "version.py",
         name              = str(bld.path)+":version",
         version           = _version(),
         lasthash          = lasthash(),
         lastdate          = lastdate(),
         isdirty           = isdirty(),
         timestamp         = lasttimestamp(),
-        install_path      = '${PYTHONARCHDIR}/'+Path(str(bld.run_dir)).stem,
-        cpp_compiler_name = bld.cpp_compiler_name())
+        cpp_compiler_name = bld.cpp_compiler_name(),
+        ** bld.installpath("code")
+    )
 
 @runall
 def options(opt:Context):

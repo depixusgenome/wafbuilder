@@ -75,6 +75,11 @@ class Make:
         "Finds all build methods in child class members"
         run(bld, 'build', makes(cls))
 
+    @classmethod
+    def install(cls, bld):
+        "Finds all install methods in child class members"
+        run(bld, 'install', makes(cls))
+
 def run(item:Context, name:str, elems:Iterable):
     "runs a method to all elements"
     for cls in elems:
@@ -178,7 +183,11 @@ def addmissing(glob = None):
         "applies build from all basic items"
         run(bld, 'build', items)
 
-    for val in (load, toload, options, configure, build):
+    def install(bld:Context):
+        "applies install from all basic items"
+        run(bld, 'install', items)
+
+    for val in (load, toload, options, configure, build, install):
         val.__module__ = glob['__name__']
         glob.setdefault(val.__name__, val)
 

@@ -4,7 +4,6 @@
 import re
 from typing                 import Sequence, List
 from contextlib             import closing
-from pathlib                import Path
 
 from waflib.Context         import Context
 from .._utils               import Make, copyargs, copyroot
@@ -141,7 +140,6 @@ def buildpyext(bld     : Context,
     args.setdefault('target',   target)
     args.setdefault('features', []).append('pyext')
     args.setdefault('name',     name+":pyext")
-    root = Path(str(bld.run_dir)).stem+"/"
-    args.setdefault('install_path', '${PYTHONARCHDIR}/'+root+(name if pysrc else ''))
+    args.update(**bld.installpath("code", name if pysrc else ""))
 
     bld.shlib(**args)
