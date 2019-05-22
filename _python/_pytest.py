@@ -76,12 +76,12 @@ class PyTesting:
         import os
         from   pathlib   import Path
         from   importlib import import_module
-        from   logging   import getLogger
-        getLogger('test').info(
+        from   waflib.Logs   import info
+        info(
             "Using CONDA_DEFAULT_ENV: %s",
             os.environ.get('CONDA_DEFAULT_ENV', '-')
         )
-        getLogger('test').info("Path to os module: %s", os.__file__)
+        info("Path to os module: %s", os.__file__)
         os.chdir("build")
         opt = bld.options
         if opt.TEST_HEADLESS:
@@ -106,12 +106,15 @@ class PyTesting:
         import os
         from   pathlib   import Path
         from   importlib import import_module
+        from   waflib.Logs   import info
         os.chdir("build")
-        opt = bld.options
+        opt  = bld.options
+        gcda = any(Path(".").glob("./**/*.gcda"))
+        info("Found gcda files at %s: %s", Path(".").resolve(), gcda)
         Path(opt.TEST_COV).mkdir(parents = True, exist_ok = True)
-        out = opt.TEST_COV + ('/Python' if any(Path(".").glob("./**/*.gcda")) else '')
+        out = opt.TEST_COV + ('/Python' if gcda else '')
         import_module(cls.COV).main(["html", "-i", *cls.OMITS, "-d", out])
-        if any(Path(".").glob("./**/*.gcda")):
+        if gcda:
             cls.__lcov(bld)
 
     @classmethod

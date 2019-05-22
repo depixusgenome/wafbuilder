@@ -35,6 +35,7 @@ FLAGS           = {'/std:c++14': '-std=c++14',
                   }
 COVERAGE        = {
     'g++': {"cxx": '-fprofile-arcs --coverage', 'links': "-lgcov --coverage"},
+    'clang++': {"cxx": '-fprofile-instr-generate -fcoverage-mapping', 'links': "--coverage"},
 }
 
 def _ismsvc(cnf:Context):
