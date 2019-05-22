@@ -70,7 +70,14 @@ def shellvars(cnf, defaults = None, **kwa)-> Tuple[Tuple[str, str]]:
     if sys.platform.startswith("win"):
         raise NotImplementedError("Needs coding the conda env discovery & setup")
 
-    conda = kwa.get('conda', getattr(cnf, 'env', {}).get('CONDA', 'conda'))
+    conda = kwa.get('conda', None)
+    if not conda and hasattr(cnf, 'env'):
+        conda = cnf.env.CONDA
+        if conda and isinstance(conda, (list, tuple)):
+            conda = conda[0]
+    if not conda:
+        conda = "conda"
+
     avail = {
         i.strip()[:i.find(' ')]: i.strip()[i.rfind(' ')+1:]
         for i in _envnames([conda, 'info', '-e'])

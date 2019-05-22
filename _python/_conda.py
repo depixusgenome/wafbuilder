@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 "All *basic* python related details"
 import subprocess
-import urllib.request as request
+import urllib.request
 import tempfile
 import os
 import sys
@@ -22,11 +22,8 @@ CHANNELS = ['', ' -c conda-forge']
 class CondaSetup: # pylint: disable=too-many-instance-attributes
     "installs / updates a conda environment"
     def __init__(self, cnf = None, **kwa):
-        self.envname  = kwa.get('envname', getattr(cnf.env, 'CONDA_DEFAULT_ENV', None))
-        if not self.envname:
-            from ..shellvars import shellvars
-            self.envname = dict(shellvars(cnf))['CONDA_DEFAULT_ENV']
-
+        from ..shellvars import condaenvname
+        self.envname  = condaenvname(cnf)
         self.packages = kwa.get('packages', getattr(cnf.options, 'packages', '').split(','))
         self.reqs     = kwa.get('required', requirements)
         if self.packages == ['']:
@@ -55,7 +52,7 @@ class CondaSetup: # pylint: disable=too-many-instance-attributes
     def options(opt:Context):
         "defines options for conda setup"
         from ..shellvars import ENV_DEFAULT
-        grp = opt.add_option_group('condasetup options')
+        grp = opt.add_option_group('Condasetup Options')
         grp.add_option(
             '-e', '--envname',
             dest    = 'condaenv',
@@ -116,7 +113,7 @@ class CondaSetup: # pylint: disable=too-many-instance-attributes
             site  = "https://repo.continuum.io/miniconda/Miniconda3-latest-"
             site += 'Linux-x86_64.sh' if islin else "Windows-x86_64.exe"
             down  = tempfile.mktemp(suffix = 'sh' if islin else 'exe')
-            request.urlretrieve(site, down)
+            urllib.request.urlretrieve(site, down)
             if islin:
                 subprocess.check_call(['bash', down, '-b'])
             else:
@@ -305,6 +302,8 @@ class CondaSetup: # pylint: disable=too-many-instance-attributes
     def __nodejs_run(self):
         "Installs nodejs modules"
         name  = self._nodejs
+        if name not in requirements:
+            return
         itms  = requirements(name, runtimeonly = self.rtime)
         if len(self.packages):
             itms = {i: j for i, j in itms.items() if i in self.packages}
@@ -413,7 +412,6 @@ def condasetup(cnf:Context = None, **kwa):
     ):
         cset = CondaSetup(cnf, required = reqs, **kwa)
         if cset.copy is None:
-            assert False
             cset.run()
         else:
             cset.copyenv()
