@@ -15,6 +15,7 @@ os.environ['PREFIX'] = (
     ('patch_' if '--patch' in ARGS else '')
     +import_module("git").version()
 )
+print("PREFIX="+os.environ['PREFIX'])
 
 FNAME = str(
     (

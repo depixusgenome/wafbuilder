@@ -12,8 +12,11 @@ from waflib.Configure       import conf
 
 from ._defaults     import wscripted, defaultwscript
 from ._requirements import REQ as requirements, OPT as suggested
-from ._utils        import (addmissing, appname, appdir, copyfiles,
-                            runall, patch, getlocals, copyroot, FILTERS)
+from ._utils        import (
+    addmissing, appname, appdir, copyfiles,
+    runall, patch, getlocals, copyroot, FILTERS,
+    CODE_PATH
+)
 from ._python       import (
     checkpy, findpyext, condaenv, condasetup, CHANNELS,
     PyTesting

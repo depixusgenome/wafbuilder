@@ -35,9 +35,7 @@ class Linting:
     @classmethod
     def run(cls, bld:Context, name:str, items:Sequence, *discards):
         "builds tasks for checking code"
-        if bld.options.DO_PY_LINTING is False or len(items) == 0:
-            return
-        if 'Install' in type(bld).__name__:
+        if bld.options.DO_PY_LINTING is False or len(items) == 0 or bld.cmd != 'build':
             return
 
         deps  = cls.__make_deps(bld, name, items)
@@ -55,7 +53,8 @@ class Linting:
     @staticmethod
     def options(opt: Context):
         "add options"
-        return (opt
+        return (
+            opt
             .add_option_group("Python Options")
             .add_option(
                 "--nolinting",

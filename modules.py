@@ -8,7 +8,6 @@ automatically
 """
 from   pathlib          import Path
 from   contextlib       import contextmanager
-from   typing           import Optional
 
 from   waflib.Build     import BuildContext
 from   waflib.Configure import ConfigurationContext
@@ -63,9 +62,10 @@ class Modules:
 
     def run_configure(self, cnf):
         "configure wafbuilder"
-        cnv.env.MODULE_SOURCE_DIR = list(self._src)
+        cnf.env.MODULE_SOURCE_DIR = list(self._src)
         with self.configure(cnf):
             wafbuilder.configure(cnf)
+        cnf.env.append_unique('INCLUDES',  ['../../'+i for i in self._src])
 
     def run_tests(self, bld, root = 'tests'):
         "runs pytests"
@@ -132,7 +132,7 @@ class Modules:
         "simple config"
         cls().addbuild(locs, simple = simple)
 
-    def simple(self, cachepath: Optional[str] = None):
+    def simple(self):
         "simple config"
         class _CondaEnvName(basecontext()):
             fun = cmd = 'condaenvname'
@@ -230,8 +230,9 @@ def globalmake(glob = None, apppackager = False, **kwa):
         glob = getlocals()
 
     mdl = Modules(**{i: kwa.pop(i) for i in set(kwa) & {'singles', 'src', 'binit'}})
-    glob.update(mdl.simple(**kwa))
+    glob.update(mdl.simple())
 
     if apppackager:
         from .apppackager import package
-        glob.update(package(mdl))
+        package(glob, mdl, **kwa)
+    return mdl

@@ -9,7 +9,8 @@ from typing         import (Iterator, Callable, # pylint: disable=unused-import
 from types          import ModuleType, FunctionType
 from functools      import wraps
 
-from waflib.Context import Context
+from waflib.Context   import Context
+from waflib.Configure import conf
 
 YES = type('YES', (object,), dict(__doc__ = "Used as a typed enum"))()
 
@@ -193,7 +194,7 @@ def addmissing(glob = None):
 
 def copyroot(bld:Context, arg):
     "returns the root where items are copied"
-    root = getattr(bld.options, 'APP_PATH', bld.bldnode)
+    root = bld.bldnode
     return root.make_node(arg) if isinstance(arg, str) else root
 
 def copytargets(bld:Context, arg, items):
@@ -225,7 +226,7 @@ def copytask(tsk):
 
 def copyfiles(bld:Context, arg, items:Sequence):
     "copy py modules to build root path"
-    if len(items) == 0:
+    if len(items) == 0 or bld.cmd != "build":
         return
 
     def _kword(_):
@@ -313,3 +314,18 @@ def patch(arg = None, locs = None):
     if callable(arg):
         return _wrapper(arg)
     return _wrapper
+
+CODE_PATH = "code"
+@conf
+def installpath(*names, direct = False) -> Union[str, Dict[str, str]]:
+    "return the install path"
+    if names and not isinstance(names[0], str):
+        names = names[1:]
+    path = '${PREFIX}/'+'/'.join(names)
+    return path if direct else {"install_path": path}
+@conf
+def installcodepath(*names, direct = False) -> Union[str, Dict[str, str]]:
+    "return the install path"
+    if names and not isinstance(names[0], str):
+        names = names[1:]
+    return installpath("code", *names, direct = direct)

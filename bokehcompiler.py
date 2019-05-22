@@ -45,31 +45,35 @@ def build_bokehjs(bld, viewname, key):
             modules.append(modules[-1]+'.'+i)
 
     paths = bld.env.BOKEH_DEFAULT_JS_PATHS
-    for i in sum((j.ant_glob('**/*.py') for j in paths), []):
-        i = i.srcpath()
-        if Path(str(i)).name[:2] != '__':
-            modules.append(str(i)[5:-3].replace("/", ".").replace("\\", "."))
+    root  = Path(str(bld.launch_dir))
+    for i in sum((list(Path(j).glob('**/*.py')) for j in paths), []):
+        if i.name[:2] == '__':
+            continue
+
+        i = str(i.relative_to(root))[:-3].replace("/", ".").replace("\\", ".")
+        modules.append( i[i.find(".")+1:])
 
     modules = [i for i in modules if i[:2] != '__']
-    root    = bld.path.ctx.bldnode
     mods    = [i.split('.')[0] for i in modules]
     mods    = [j for i, j in enumerate(mods) if j not in mods[:i]]
-    srcs    = sum((root.ant_glob(i.replace('.', '/')+'/**/*.coffee') for i in mods), [])
-    srcs   += sum((root.ant_glob(i.replace('.', '/')+'/**/*.ts') for i in mods), [])
+    srcs    = []
+    for i in mods:
+        for j in ('ts', 'coffee'):
+            srcs.extend(root.glob(f"*/{i.replace('.', '/')}/**/*.{j}"))
 
     from wafbuilder import copyroot
     tgt  = copyroot(bld, key+'.js')
 
     rule = f'{bld.env["PYTHON"][0]} {__file__} '+' '.join(modules)+' -o ${TGT} -k '+key
     bld(
-        source       = srcs,
+        source       = [bld.srcnode.find_node(str(k.relative_to(root))) for k in srcs],
         name         = modules[0]+':bokeh',
         color        = 'BLUE',
         rule         = rule,
         target       = tgt,
         cls_keyword  = lambda _: 'Bokeh',
-        group        = 'bokeh'
-        **bld.installpath("code")
+        group        = 'bokeh',
+        **bld.installcodepath()
     )
 
 if __name__ == '__main__':

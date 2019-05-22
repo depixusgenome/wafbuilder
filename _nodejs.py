@@ -21,7 +21,7 @@ TaskGen.declare_chain(
     install_path = None)
 
 @requirements.addcheck
-def check_nodejs(cnf, name, version):
+def check_nodejs(cnf, _, version):
     "check for nodejs"
     mand = not sys.platform.startswith("win")
     requirements.programversion(cnf, 'node', version, mandatory = mand)
@@ -81,13 +81,8 @@ def build_coffeescript(bld:Context, name:str):
     "builds all coffee files"
     coffees = bld.path.ant_glob('**/*.coffee')
     copyfiles(bld, name, coffees)
-    if (
-            ('nodejs', 'coffeescript') in requirements
-            and getattr(bld.options, 'APP_PATH', None) is None
-    ):
-        if 'COFFEE' in bld.env:
-            bld(source = coffees)
-
+    if bld.cmd == 'build' and ('nodejs', 'coffeescript') in requirements and 'COFFEE' in bld.env:
+        bld(source = coffees)
         if bld.options.DO_PY_LINTING:
             coffeelint(bld)
 

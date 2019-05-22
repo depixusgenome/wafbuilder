@@ -1,8 +1,9 @@
 #!/usr/bin/env python2
 # -*- coding: utf-8 -*-
 "All *basic* python related details"
+import os
 from pathlib            import Path
-from typing             import Sequence, List
+from typing             import Sequence, List, Tuple
 from waflib.Configure   import conf
 from waflib.Context     import Context
 from ..git              import (
@@ -49,25 +50,12 @@ def removeunknowns(bld:Context, name:str):
             cls_keyword = lambda _: 'unknowns',
             rule        = _rem)
 
-def buildpymod(bld:Context, name:str, pysrc:Sequence, doremove = True, **_):
-    "builds a python module"
-    if len(pysrc) == 0 or 'Install' in type(bld).__name__:
-        return
-
-    if getattr(bld.options, 'APP_PATH', None) is None:
-        if doremove:
-            removeunknowns(bld, name)
-        bld(
-            name         = str(bld.path)+":py",
-            features     = "py",
-            source       = pysrc,
-            **bld.installpath("code", name if pysrc else "")
-        )
+def _pymod_splitfiles(bld, name, pysrc) -> Tuple[List[tuple], List[tuple]]:
     srclist:  List[tuple] = []
     testlist: List[tuple] = []
 
-    testroot            = copyroot(bld, TESTS[1])
-    srcroot             = copyroot(bld, name)
+    testroot = copyroot(bld, TESTS[1])
+    srcroot  = copyroot(bld, name)
     for itm in pysrc:
         path   = Path(str(itm))
         parent = path.parent
@@ -79,12 +67,47 @@ def buildpymod(bld:Context, name:str, pysrc:Sequence, doremove = True, **_):
             srclist.append((itm, srcroot.make_node(tgt)))
         else:
             testlist.append((itm, testroot.make_node(tgt)))
+    return srclist, testlist
 
+def _pymod_build(bld, name, pysrc, doremove):
+    srclist, testlist = _pymod_splitfiles(bld, name, pysrc)
     copyfiles(bld, name,     srclist)
     copyfiles(bld, TESTS[1], testlist)
 
-    if getattr(bld.options, 'APP_PATH', None) is None:
-        Linting.run(bld, name, [i for i,_ in srclist])
+    if doremove:
+        removeunknowns(bld, name)
+
+    bld(
+        name         = str(bld.path)+":py",
+        features     = "py",
+        source       = pysrc,
+        install_path = None
+    )
+
+    Linting.run(bld, name, [i for i,_ in srclist])
+
+def _pymod_install(bld, name, pysrc):
+    ext     = ".pyc" if bld.env.PYC else ".pyo" if bld.env.PYO else ".py"
+    root    = Path(str(bld.run_dir))
+    bldir   = Path(str(bld.out_dir))
+    instdir = Path(bld.installcodepath(direct = True))
+    for node, _  in _pymod_splitfiles(bld, name, pysrc)[0]:
+        src = Path(str(node))
+        src = (src.parent/src.stem).with_suffix(ext).relative_to(root)
+        bld.install_files(
+            str(instdir.joinpath(*src.parts[1:-1])),
+            [bld.root.find_node(str(bldir/src))]
+        )
+
+def buildpymod(bld:Context, name:str, pysrc:Sequence, doremove = True, **_):
+    "builds a python module"
+    if len(pysrc) == 0:
+        return
+
+    if bld.cmd == "build":
+        _pymod_build(bld, name, pysrc, doremove)
+    else:
+        _pymod_install(bld, name, pysrc)
 
 @conf
 def build_python(bld:Context, name:str, version:str, **kwargs):
@@ -96,16 +119,17 @@ def build_python(bld:Context, name:str, version:str, **kwargs):
     pysrc   = bld.path.ant_glob('**/*.py')
     buildpyext(bld, name, version, pysrc, csrc, **kwargs)
     buildpymod(bld, name, pysrc, **kwargs)
-    if 'Install' in type(bld).__name__:
-        return
-    copyfiles(bld,  name, bld.path.ant_glob('**/*.ipynb'))
+    if bld.cmd == 'build':
+        copyfiles(bld,  name, bld.path.ant_glob('**/*.ipynb'))
 
 @conf
 def build_python_version_file(bld:Context):
     "creates a version.py file"
     bld(
         features          = 'subst',
-        source            = bld.srcnode.find_resource(__package__+'/_version.template'),
+        source            = bld.srcnode.find_resource(
+            __package__.replace(".", "/")+'/_version.template'
+        ),
         target            = "version.py",
         name              = str(bld.path)+":version",
         version           = _version(),
@@ -114,7 +138,7 @@ def build_python_version_file(bld:Context):
         isdirty           = isdirty(),
         timestamp         = lasttimestamp(),
         cpp_compiler_name = bld.cpp_compiler_name(),
-        ** bld.installpath("code")
+        ** bld.installcodepath()
     )
 
 @runall

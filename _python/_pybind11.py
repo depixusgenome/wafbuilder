@@ -140,6 +140,6 @@ def buildpyext(bld     : Context,
     args.setdefault('target',   target)
     args.setdefault('features', []).append('pyext')
     args.setdefault('name',     name+":pyext")
-    args.update(**bld.installpath("code", name if pysrc else ""))
+    args.update(**bld.installcodepath(name if pysrc else ""))
 
     bld.shlib(**args)

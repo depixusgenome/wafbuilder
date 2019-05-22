@@ -16,23 +16,24 @@ from waflib                 import Logs
 from waflib.Context         import Context
 from .._requirements        import REQ as requirements, OPT as suggested
 from .._cpp                 import Boost
-from ..git                  import branch as _branch
 
 CHANNELS = ['', ' -c conda-forge']
 
 class CondaSetup: # pylint: disable=too-many-instance-attributes
     "installs / updates a conda environment"
-    def __init__(self, cnf = None, conda = None, **kwa):
-        self.envname  = kwa.get('envname',  getattr(cnf, 'condaenv', 'root'))
-        if self.envname == "branch":
-            self.envname = _branch()
-        self.packages = kwa.get('packages', getattr(cnf, 'packages', '').split(','))
+    def __init__(self, cnf = None, **kwa):
+        self.envname  = kwa.get('envname', getattr(cnf.env, 'CONDA_DEFAULT_ENV', None))
+        if not self.envname:
+            from ..shellvars import shellvars
+            self.envname = dict(shellvars(cnf))['CONDA_DEFAULT_ENV']
+
+        self.packages = kwa.get('packages', getattr(cnf.options, 'packages', '').split(','))
         self.reqs     = kwa.get('required', requirements)
         if self.packages == ['']:
             self.packages = []
 
-        self.minvers = kwa.get('minversion',  getattr(cnf, 'minversion',  False))
-        self.rtime   = kwa.get('runtimeonly', getattr(cnf, 'runtimeonly', False))
+        self.minvers = kwa.get('minversion',  getattr(cnf.options, 'minversion',  False))
+        self.rtime   = kwa.get('runtimeonly', getattr(cnf.options, 'runtimeonly', False))
         self.copy    = kwa.get('copy', None)
 
         if getattr(cnf, 'pinned', None) is None:
@@ -40,17 +41,14 @@ class CondaSetup: # pylint: disable=too-many-instance-attributes
             lst.extend(i.replace('python-', '') for i in lst if 'python-' in i)
         else:
             lst = [i.strip().lower() for i in getattr(cnf, 'pinned', '').split(',')]
-        self.pinned  = kwa.get('pinned',  lst)
-        self._conda  = conda if conda else ['conda']
+        self.pinned  = kwa.get('pinned', lst)
+        self._conda  = kwa.get('conda',  cnf.env.CONDA)
         self._nodejs = 'nodejs'
 
     @staticmethod
     def configure(cnf:Context):
         "get conda script"
-        env = getattr(cnf.options, 'condaenv', 'base')
-        if env == 'root':
-            env = os.environ.get('CONDA_DEFAULT_ENV', 'base')
-        cnf.env.CONDA_DEFAULT_ENV = env
+        cnf.env.CONDA_DEFAULT_ENV = os.environ['CONDA_DEFAULT_ENV']
         cnf.find_program("conda", var="CONDA", mandatory=True)
 
     @staticmethod
@@ -334,7 +332,7 @@ class CondaSetup: # pylint: disable=too-many-instance-attributes
                 if npm is not None:
                     break
         else:
-            if self.envname == 'root':
+            if self.envname in ('base', 'root'):
                 npm = _get(info['default_prefix'])
         assert npm is not None
 
@@ -413,8 +411,9 @@ def condasetup(cnf:Context = None, **kwa):
             if getattr(cnf.options, 'suggested', False) else
             (requirements,)
     ):
-        cset = CondaSetup(cnf.options, conda = cnf.env['CONDA'], required = reqs, **kwa)
+        cset = CondaSetup(cnf, required = reqs, **kwa)
         if cset.copy is None:
+            assert False
             cset.run()
         else:
             cset.copyenv()
