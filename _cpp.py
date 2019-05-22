@@ -54,9 +54,13 @@ class Flags(Make):
     u"deal with cxx/ld flags"
     DEFAULT_CXX = {'linux': '-std=c++17', 'msvc': '/std:c++14'}
     @classmethod
-    def defaultcxx(cls) -> str:
+    def defaultcxx(cls, andg = False) -> str:
         "return the default cxx"
-        return cls.DEFAULT_CXX["msvc" if sys.platform.startswith('win') else 'linux']
+        out = cls.DEFAULT_CXX["msvc" if sys.platform.startswith('win') else 'linux']
+        if andg:
+            out += ' /EHsc' if sys.platform.startswith('win') else ' -g'
+        return out
+
 
     @classmethod
     def options(cls, opt):
@@ -65,13 +69,19 @@ class Flags(Make):
             return
 
         copt     = opt.add_option_group(CXX_OPTION_GROUP)
-        cxxflags = cls.defaultcxx()+(' /EHsc' if sys.platform.startswith('win') else ' -g')
+        cxxflags = cls.defaultcxx(andg = True)
 
-        copt.add_option('--cxxflags',
-                        dest    = 'cxxflaglist',
-                        default = cxxflags,
-                        action  = 'store',
-                        help    = f'define cxx flags (defaults are {cxxflags})')
+        copt.add_option(
+            '--cxxflags',
+            dest    = 'cxxflaglist',
+            default = cxxflags,
+            action  = 'store',
+            help    = (
+                f'define cxx flags (defaults are {cxxflags}), '
+                'start with "+" to include them'
+            )
+        )
+
         copt.add_option('--linkflags',
                         dest    = 'linkflaglist',
                         default = '',
@@ -112,6 +122,10 @@ class Flags(Make):
             args   = COVERAGE.get(name, COVERAGE.get(name[:3], {}))
             cxx   += " "+args.get('cxx', '')
             links += " "+args.get('links', '')
+
+        if cnf.options.cxxflaglist[0] == "+":
+            cxx = cls.defaultcxx(andg= True)+" "+cxx[1:]
+        links += " ".join(i for i in cxx.split(" ") if "-fsanitize=" in i) 
 
         cxx   = cls.convertFlags(cnf, cxx)
         links = cls.convertFlags(cnf, links)
@@ -275,27 +289,31 @@ def check_cpp_default(cnf:Context, name:str, version:Optional[str]):
 
 def hasmain(csrc):
     u"detects whether a main function is declared"
-    pattern = re.compile(r'\s*int\s*main\s*\(\s*int\s*\w+\s*,\s*(const\s*)?char\s')
+    pattern = re.compile(r'^\s*int\s+main\s*\(\s*int[\s,].*')
     for item in csrc:
         with closing(open(item.abspath(), 'r')) as stream:
             if any(pattern.match(line) is not None for line in stream):
-                return item
-    return None
+                yield item
 
 @conf
-def build_cpp(bld:Context, name:str, version:str, **kwargs):
+def build_cpp(bld:Context, name:str, version:str, ignore = None, **kwargs):
     u"builds a cpp extension"
-    rem  = str(bld.bldnode)
+    rem  = [str(bld.bldnode)]
+    rem += (
+        [ignore]        if isinstance(ignore, str) else
+        list(ignore)    if ignore                  else
+        []
+    )
     csrc = [
         i
         for i in bld.path.ant_glob('**/*.cpp', exclude = kwargs.get('python_cpp', []))
-        if not str(i).startswith(rem)
+        if not any(str(i).startswith(j) for j in rem)
     ]
     if len(csrc) == 0:
         return
 
-    prog = hasmain(csrc)
-    csrc = [i for i in csrc if csrc is not prog]
+    progs = list(hasmain(csrc))
+    csrc  = [i for i in csrc if csrc is not progs]
 
     args = copyargs(kwargs)
 
@@ -321,12 +339,15 @@ def build_cpp(bld:Context, name:str, version:str, **kwargs):
         args['name']   = name+"_lib"
         bld.shlib(**args)
 
-    if prog is not None:
+    for prog in progs:
+        progname       = Path(str(prog)).stem
         args['source'] = [prog, _template('program')]
-        args['name']   = name+"_prog"
-        if len(csrc):
-            args.setdefault('use', []).append(name+'_lib')
-        bld.program(**args)
+        args['target'] = progname
+        args['name']   = name + ': ' + progname
+        bld.program(**dict(
+            args,
+            use = [*args.get('use', ()), *([name+'_lib'] if csrc else ())]
+        ))
 
 @conf
 def cpp_compiler_name(cnf:Context):
