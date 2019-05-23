@@ -3,6 +3,7 @@
 u"Default cpp for waf"
 import sys
 import re
+import textwrap
 from   pathlib          import Path
 from typing             import Optional, List
 from contextlib         import closing
@@ -39,9 +40,29 @@ FLAGS           = {'/std:c++14': '-std=c++14',
                    '/openmp':    '-fopenmp',
                    '/EHsc':      '',
                   }
-COVERAGE        = {
-    'g++': {"cxx": '-fprofile-arcs --coverage', 'links': "-lgcov --coverage"},
-    'clang++': {"cxx": '-fprofile-instr-generate -fcoverage-mapping', 'links': "--coverage"},
+
+DEFAULT_CXX = {
+    **dict.fromkeys(('g++', 'clang++', 'linux'), '-std=c++17 -g'),
+    **dict.fromkeys(('msvc',),                   '/std:c++17 /EHsc')
+}
+
+OPTIONS = {
+    '+coverage': {
+        'g++':     {
+            'cxx':   '-fprofile-arcs --coverage',
+            'links': '-lgcov --coverage'
+        },
+        'clang++': {
+            'cxx':   '-fprofile-instr-generate -fcoverage-mapping',
+            'links': '--coverage'
+        },
+    },
+    '+sanitize': {
+        i: {
+            'cxx':   '-fsanitize=address -fno-omit-frame-pointer -O0',
+            'links': '-fsanitize=address'
+        } for i in ('g++', 'clang++')
+    }
 }
 
 def _ismsvc(cnf:Context):
@@ -51,15 +72,11 @@ def _isrequired():
     return 'cpp' in requirements
 
 class Flags(Make):
-    u"deal with cxx/ld flags"
-    DEFAULT_CXX = {'linux': '-std=c++17', 'msvc': '/std:c++14'}
+    "deal with cxx/ld flags"
     @classmethod
-    def defaultcxx(cls, andg = False) -> str:
+    def defaultcxx(cls) -> str:
         "return the default cxx"
-        out = cls.DEFAULT_CXX["msvc" if sys.platform.startswith('win') else 'linux']
-        if andg:
-            out += ' /EHsc' if sys.platform.startswith('win') else ' -g'
-        return out
+        return DEFAULT_CXX["msvc" if sys.platform.startswith('win') else 'linux']
 
 
     @classmethod
@@ -69,16 +86,19 @@ class Flags(Make):
             return
 
         copt     = opt.add_option_group(CXX_OPTION_GROUP)
-        cxxflags = cls.defaultcxx(andg = True)
+        cxxflags = cls.defaultcxx()
 
         copt.add_option(
             '--cxxflags',
             dest    = 'cxxflaglist',
             default = cxxflags,
             action  = 'store',
-            help    = (
-                f'define cxx flags (defaults are {cxxflags}), '
-                'start with "+" to include them'
+            help    = textwrap.dedent(f'''
+                define cxx flags (defaults are {cxxflags}). The following is understood:
+                    - a '+' as first character will be replaced by '{cxxflags}.
+                    - '+coverage' will be replaced by '{OPTIONS['+coverage']['g++']['cxx']}'.
+                    - '+sanitize' will be replaced by '{OPTIONS['+sanitize']['g++']['cxx']}'.
+                '''
             )
         )
 
@@ -92,6 +112,11 @@ class Flags(Make):
                         default = False,
                         action  = 'store_true',
                         help    = 'add coverage flags')
+        copt.add_option('--sanitize',
+                        dest    = 'sanitizeflags',
+                        default = False,
+                        action  = 'store_true',
+                        help    = 'add sanitizing flags')
 
     @staticmethod
     def convertFlags(cnf:Context, cxx, islinks = False):
@@ -113,19 +138,24 @@ class Flags(Make):
             return
         cls._DONE = True
 
-        warns = WARNINGS.get(cnf.env['COMPILER_CXX'], WARNINGS[...])
-        cxx   = cnf.options.cxxflaglist + ' ' + ' '.join(warns)
+        name  = cnf.env['COMPILER_CXX']
+        cxx   = cnf.options.cxxflaglist
         links = cnf.options.linkflaglist
 
-        if cnf.options.coverageflags:
-            name   = cnf.env['COMPILER_CXX']
-            args   = COVERAGE.get(name, COVERAGE.get(name[:3], {}))
-            cxx   += " "+args.get('cxx', '')
-            links += " "+args.get('links', '')
+        # add options
+        for i, j in OPTIONS.items():
+            if i not in cxx and getattr(cnf.options, i[1:]+'flags'):
+                cxx += ' ' + i
+            if i in cxx and name in j:
+                cxx   = cxx.replace(i, j[name].get('cxx', ''))
+                links = links.strip()+" "+j[name].get('links', '')
 
-        if cnf.options.cxxflaglist[0] == "+":
-            cxx = cls.defaultcxx(andg= True)+" "+cxx[1:]
-        links += " ".join(i for i in cxx.split(" ") if "-fsanitize=" in i) 
+        # add default flags
+        if cxx[0] == "+":
+            cxx = cls.defaultcxx().strip()+" "+cxx[1:]
+
+        # add warnings
+        cxx  +=  ' ' + ' '.join(WARNINGS.get(name, WARNINGS[...]))
 
         cxx   = cls.convertFlags(cnf, cxx)
         links = cls.convertFlags(cnf, links)
@@ -138,7 +168,6 @@ class Flags(Make):
         cnf.env.append_unique('CXXFLAGS',  Utils.to_list(cxx))
         cnf.env.append_unique('LINKFLAGS', Utils.to_list(links))
         cnf.env.append_unique('INCLUDES',  ['../'])
-        cnf.env.append_unique('CXXFLAGS', warns)
 
 class Boost(Make):
     u"deal with cxx/ld flags"
