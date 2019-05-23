@@ -5,8 +5,7 @@ import sys
 import re
 import textwrap
 from   pathlib          import Path
-from typing             import Optional, List
-from contextlib         import closing
+from typing             import Optional, List, Tuple
 from distutils.version  import LooseVersion
 from waflib             import Utils
 from waflib.Configure   import conf
@@ -316,13 +315,14 @@ def check_cpp_default(cnf:Context, name:str, version:Optional[str]):
                       args            = '--cflags --libs',
                       atleast_version = version)
 
-def hasmain(csrc):
-    u"detects whether a main function is declared"
-    pattern = re.compile(r'^\s*int\s+main\s*\(\s*int[\s,].*')
+_PATTERN = re.compile(r'^\s*int\s+main\s*\(\s*int[\s,].*')
+def splitmains(csrc) -> Tuple[List[Path], List[Path]]:
+    "detects whether a main function is declared"
+    itms    = [], []
     for item in csrc:
-        with closing(open(item.abspath(), 'r')) as stream:
-            if any(pattern.match(line) is not None for line in stream):
-                yield item
+        with open(item.abspath(), 'r', encoding = 'utf-8') as stream:
+            itms[any(_PATTERN.match(line) for line in stream)].append(item)
+    return itms
 
 @conf
 def build_cpp(bld:Context, name:str, version:str, ignore = None, **kwargs):
@@ -341,10 +341,7 @@ def build_cpp(bld:Context, name:str, version:str, ignore = None, **kwargs):
     if len(csrc) == 0:
         return
 
-    progs = list(hasmain(csrc))
-    csrc  = [i for i in csrc if csrc is not progs]
-
-    args = copyargs(kwargs)
+    csrc, progs = splitmains(csrc)
 
     def _template(post):
         res = bld.srcnode.find_resource(__package__+'/_program.template')
@@ -361,21 +358,19 @@ def build_cpp(bld:Context, name:str, version:str, ignore = None, **kwargs):
            cpp_compiler_name = bld.cpp_compiler_name()
         ).target
 
+    args = copyargs(kwargs)
     args.setdefault('target', name)
     if len(csrc):
-        csrc.append(_template('lib'))
-        args['source'] = csrc
-        args['name']   = name+"_lib"
-        bld.shlib(**args)
+        bld.shlib(**dict(args,  source = csrc+[_template("lib")], name = name+"_lib"))
 
-    for prog in progs:
-        progname       = Path(str(prog)).stem
-        args['source'] = [prog, _template('program')]
-        args['target'] = progname
-        args['name']   = name + ': ' + progname
+    for prog in progs[::-1]:
+        progname = Path(str(prog)).stem
         bld.program(**dict(
             args,
-            use = [*args.get('use', ()), *([name+'_lib'] if csrc else ())]
+            source = [prog, *(() if csrc else (_template('program'),))],
+            target = progname,
+            name   = name + ': ' + progname,
+            use    = ([name+'_lib'] if csrc else []) + args.get('use', [])
         ))
 
 @conf
