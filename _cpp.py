@@ -7,7 +7,7 @@ import textwrap
 from   pathlib          import Path
 from typing             import Optional, List, Tuple
 from distutils.version  import LooseVersion
-from waflib             import Utils
+from waflib             import Utils,Errors
 from waflib.Configure   import conf
 from waflib.Context     import Context
 from waflib.TaskGen     import after_method,feature
@@ -283,6 +283,59 @@ def check_cpp_compiler(cnf:Context, name:str, version:Optional[str]):
                   +' should be greater than '+version)
 
 @requirements.addcheck
+def check_cpp_gtest(cnf:Context, name:str, version:Optional[str]):
+    rem = not getattr(cnf.env, 'PYTHON')
+    if rem:
+        cnf.find_program("python", var="PYTHON", mandatory=False)
+
+    if not getattr(cnf.env, 'PYTHON'):
+        check_cpp_default(cnf, name, version)
+        return
+
+    path = Path(cnf.env["PYTHON"][0]).parent
+    if rem:
+        del cnf.env['PYTHON']
+
+    if sys.platform.startswith("win32"):
+        path /= "Library"
+
+    vers = libmain = lib = inc = None
+    cnf.start_msg(f"Checking for conda module {name} (>= {version})")
+    for i in range(3):
+        inc     = path/"include"/"gtest"
+        libmain = path/"lib"/f"lib{name}_main.a"
+        lib     = path/"lib"/f"lib{name}.a"
+        if inc.exists() and lib.exists():
+            break
+        path = path.parent
+    else:
+        cnf.end_msg(False)
+        cnf.fatal('Could not find the conda module ' +name)
+        return
+
+    setattr(cnf.env, f"INCLUDES_{name}",  [str(inc.parent)])
+    setattr(cnf.env, f"STLIBPATH_{name}", [str(lib.parent)])
+    setattr(cnf.env, f"STLIB_{name}",     [i.stem.replace('lib', '') for i in (lib, libmain)])
+    setattr(cnf.env, f"LIB_{name}",       ['pthread'])
+    if version is None:
+        cnf.end_msg(True)
+        return
+
+    try:
+        ret = cnf.cmd_and_log(["conda", "list", name])
+    except Errors.WafError:
+        pass
+    else:
+        out = ret.strip().split('\n')
+        if len(out) == 4:
+            vers  = next((i for i in out[-1].split(" ")[1:] if i != ""), None)
+            cnf.end_msg(vers)
+            return
+
+    cnf.fatal('The %s version does not satisfy the requirements'%name)
+    cnf.end_msg(False)
+
+@requirements.addcheck
 def check_cpp_default(cnf:Context, name:str, version:Optional[str]):
     u"Adds a requirement checker"
     if name.startswith('boost'):
@@ -315,13 +368,14 @@ def check_cpp_default(cnf:Context, name:str, version:Optional[str]):
                       args            = '--cflags --libs',
                       atleast_version = version)
 
-_PATTERN = re.compile(r'^\s*int\s+main\s*\(\s*int[\s,].*')
-def splitmains(csrc) -> Tuple[List[Path], List[Path]]:
+_GTEST = re.compile(r'^\s*TEST\(')
+_MAIN  = re.compile(r'^\s*int\s+main\s*\(\s*int[\s,].*')
+def splitmains(csrc, patt) -> Tuple[List[Path], List[Path]]:
     "detects whether a main function is declared"
     itms    = [], []
     for item in csrc:
         with open(item.abspath(), 'r', encoding = 'utf-8') as stream:
-            itms[any(_PATTERN.match(line) for line in stream)].append(item)
+            itms[any(patt.match(line) for line in stream)].append(item)
     return itms
 
 @conf
@@ -341,36 +395,75 @@ def build_cpp(bld:Context, name:str, version:str, ignore = None, **kwargs):
     if len(csrc) == 0:
         return
 
-    csrc, progs = splitmains(csrc)
+    csrc, progs  = splitmains(csrc, _MAIN)
+    csrc, gtests = splitmains(csrc, _GTEST)
 
-    def _template(post):
-        res = bld.srcnode.find_resource(__package__+'/_program.template')
-        return bld(
-            features = 'subst',
-           source   = res,
-           target   = name+"_%sheader.cpp" % post,
-           name     = str(bld.path)+":%sheader" % post,
-           nsname   = name+'_'+post,
-           version  = version,
-           lasthash = _gitlasthash(name),
-           isdirty  = _gitisdirty(name),
-           timestamp= _gitlasttimestamp(name),
-           cpp_compiler_name = bld.cpp_compiler_name()
-        ).target
+    kwargs["use"] = [*kwargs.get("use", []), *build_stlib(bld, name, version, csrc, **kwargs)]
+    build_prog(bld, name, version, progs, csrc, **kwargs)
+    build_gtests(bld, name, gtests, **kwargs)
 
-    args = copyargs(kwargs)
+def build_stlib(bld, name, version, csrc, **args):
+    "build a lib"
     args.setdefault('target', name)
     if len(csrc):
-        bld.shlib(**dict(args,  source = csrc+[_template("lib")], name = name+"_lib"))
+        csrc.extend(build_versioncpp(bld, name, version, "lib"))
+        args['source'] = csrc
+        args['name']   = name+"_lib"
+        return [bld.stlib(**args).name]
+    return []
 
+def build_versioncpp(bld, name, version, post):
+    "buld a .cpp file containing version info"
+    return [bld(
+        features = 'subst',
+        source   = bld.srcnode.find_resource(__package__+'/_program.template'),
+        target   = name+"_%sheader.cpp" % post,
+        name     = str(bld.path)+":%sheader" % post,
+        nsname   = name+'_'+post,
+        version  = version,
+        lasthash = _gitlasthash(name),
+        isdirty  = _gitisdirty(name),
+        timestamp= _gitlasttimestamp(name),
+        cpp_compiler_name = bld.cpp_compiler_name()
+    ).target]
+
+
+def build_prog(bld, name, version, progs, csrc, **args):
+    "build programs"
+    sources = (
+        build_versioncpp(bld, name, version, 'program')
+        if len(progs) and not len(csrc) else
+        []
+    )
+    specs   = {
+        prog: args.pop(Path(str(prog)).stem, {})
+        for prog in progs[::-1]
+    }
     for prog in progs[::-1]:
         progname = Path(str(prog)).stem
         bld.program(**dict(
             args,
-            source = [prog, *(() if csrc else (_template('program'),))],
+            source = [prog]+sources,
             target = progname,
             name   = name + ': ' + progname,
-            use    = ([name+'_lib'] if csrc else []) + args.get('use', [])
+            use    = (
+                args.get('use', [])
+                # add libs specific to the program
+                + specs[prog].get('use', [])
+            ),
+            # add args specific to the program
+            **{i: j for i, j in specs[prog].items() if i != 'use'}
+        ))
+
+def build_gtests(bld, name, sources, **kwa):
+    "build gtests"
+    if sources:
+        bld.program(**dict(
+            kwa,
+            source = sources,
+            target = f"{name}_test_all",
+            name   = name + ': test_all',
+            use    = kwa.get("use", [])+["gtest"]
         ))
 
 @conf
