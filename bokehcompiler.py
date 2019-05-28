@@ -3,6 +3,7 @@
 "Compiles the JS code once and for all"
 import  sys
 from    typing     import List
+from    importlib  import import_module
 from    pathlib    import Path
 
 sys.path.append(str(Path(".").resolve()))
@@ -10,7 +11,7 @@ def finddependencies(*modules) -> List[str]:
     "compiles the application as would a normal call to bokeh"
     import  bokeh.util.compiler as _compiler
     for mod in modules:
-        __import__(mod)
+        import_module(mod)
     old = _compiler.nodejs_compile
     lst = []
     def _deps(_1, lang="javascript", file=None): # pylint: disable=unused-argument
@@ -26,7 +27,7 @@ def compileapp(*modules) -> str:
     import bokeh
     import bokeh.util.compiler as _compiler
     for mod in modules:
-        __import__(mod)
+        import_module(mod)
 
     mdls  = (
         () if bokeh.__version__ == '1.0.4' else
@@ -38,11 +39,11 @@ def compileapp(*modules) -> str:
 def build_bokehjs(bld, viewname, key):
     "build the js file"
     modules = list(bld.env.BOKEH_DEFAULT_MODULES)
-    if '.' in viewname:
-        for i in viewname.split('.'):
-            if i[0] == i[0].upper():
-                break
-            modules.append(modules[-1]+'.'+i)
+    parts   = viewname.split('.')
+    for i, j  in enumerate(parts):
+        if j[0] == j[0].upper():
+            break
+        modules.append('.'.join(parts[:i+1]))
 
     paths = bld.env.BOKEH_DEFAULT_JS_PATHS
     root  = Path(str(bld.launch_dir))

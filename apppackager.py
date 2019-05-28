@@ -197,7 +197,7 @@ def build_app(bld, appname, viewname, scriptname = None):
     "build gui"
     name = appname if scriptname is None else scriptname
     build_startupscripts(bld, name, appname+'.'+viewname)
-    build_bokehjs(bld, viewname, scriptname)
+    build_bokehjs(bld, appname+'.'+viewname, scriptname)
     build_doc(bld, scriptname)
     if bld.env.PANDOC:
         TaskGen.declare_chain(
