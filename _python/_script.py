@@ -87,17 +87,26 @@ def _pymod_build(bld, name, pysrc, doremove):
     Linting.run(bld, name, [i for i,_ in srclist])
 
 def _pymod_install(bld, name, pysrc):
-    ext     = ".pyc" if bld.env.PYC else ".pyo" if bld.env.PYO else ".py"
-    root    = Path(str(bld.run_dir))
-    bldir   = Path(str(bld.out_dir))
+    env     = bld.env
+    ouext   = ".pyc" if env.PYC else ".pyo" if env.PYO else ".py"
+    inext   = (
+        '.py'              if ouext == '.py' else
+        (
+            (f'.{env.PYTAG}' if env.PYTAG and not env.NOPYCACHE else '')
+            + ouext
+        )
+    )
+    cache   = "__pycache__" if env.PYTAG in inext else ''
+
+    rundir  = Path(bld.run_dir)
+    blddir  = Path(bld.out_dir)
     instdir = Path(bld.installcodepath(direct = True))
     for node, _  in _pymod_splitfiles(bld, name, pysrc)[0]:
         src = Path(str(node))
-        src = (src.parent/src.stem).with_suffix(ext).relative_to(root)
-        bld.install_files(
-            str(instdir.joinpath(*src.parts[1:-1])),
-            [bld.root.find_node(str(bldir/src))]
-        )
+        inp = blddir/((src.parent/cache/src.stem).with_suffix(inext).relative_to(bld.run_dir))
+        out = src.with_suffix(ouext)
+        out = out.relative_to(rundir/out.relative_to(rundir).parts[0])
+        bld.install_as(str(instdir/out), bld.root.find_node(str(inp)))
 
 def buildpymod(bld:Context, name:str, pysrc:Sequence, doremove = True, **_):
     "builds a python module"
