@@ -13,6 +13,7 @@ The environment settings, required for the CI, are also printed-out using the
 Finally, "condaenvname" allows extracting the conda env defined at configuration
 and re-use it *build* and *test* modes.
 """
+from   pathlib import Path
 import os
 import sys
 import subprocess
@@ -26,7 +27,12 @@ except ImportError:
 def _envnames(cnf):
     return (
         subprocess
-        .run(cnf, check = True, stdout = subprocess.PIPE, stderr = subprocess.PIPE).stdout
+        .run(
+            cnf,
+            check  = True,
+            stdout = subprocess.PIPE,
+            stderr = subprocess.PIPE,
+        ).stdout
         .decode('utf-8')
         .strip()
         .split('\n')
@@ -67,10 +73,7 @@ def shellvars(cnf, defaults = None, **kwa)-> Tuple[Tuple[str, str]]:
     if not defaults:
         defaults = ENV_DEFAULT
     envname = condaenvname(cnf, default = defaults[0], **kwa)
-    if sys.platform.startswith("win"):
-        raise NotImplementedError("Needs coding the conda env discovery & setup")
-
-    conda = kwa.get('conda', None)
+    conda   = kwa.get('conda', None)
     if not conda and hasattr(cnf, 'env'):
         conda = cnf.env.CONDA
         if conda and isinstance(conda, (list, tuple)):
@@ -92,12 +95,19 @@ def shellvars(cnf, defaults = None, **kwa)-> Tuple[Tuple[str, str]]:
                 break
         else:
             envname = ENV_BASE
+    root = Path(avail[envname])
+    if sys.platform.startswith("win"):
+        binary = root
+        path   = f'{binary};{root/"Scripts"};{os.environ["PATH"]}'
+    else:
+        binary = root/"bin"
+        path   = f'{binary}:{os.environ["PATH"]}'
     return (
         ('CONDA_DEFAULT_ENV', envname),
-        ('CONDA_PREFIX',      avail[envname]),
-        ('PYTHON_HOST_PROG',  avail[envname]+'/bin/python'),
-        ('PYTHON3_HOST_PROG', avail[envname]+'/bin/python3'),
-        ('PATH',              f'{avail[envname]}/bin:{os.environ["PATH"]}')
+        ('CONDA_PREFIX',      str(root)),
+        ('PYTHON_HOST_PROG',  str(binary/'python')),
+        ('PYTHON3_HOST_PROG', str(binary/'python3')),
+        ('PATH',              str(path))
     )
 
 def info():

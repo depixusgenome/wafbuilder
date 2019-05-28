@@ -40,6 +40,8 @@ class CondaSetup: # pylint: disable=too-many-instance-attributes
             lst = [i.strip().lower() for i in getattr(cnf, 'pinned', '').split(',')]
         self.pinned  = kwa.get('pinned', lst)
         self._conda  = kwa.get('conda',  cnf.env.CONDA)
+        if not self._conda:
+            self._conda = ['conda']
         self._nodejs = 'nodejs'
 
     @staticmethod
@@ -122,9 +124,9 @@ class CondaSetup: # pylint: disable=too-many-instance-attributes
     def __createenv(self):
         "create conda environment"
         if self.__run('list -n '+ self.envname):
-            version = requirements('python', 'numpy')
-            pyvers  = '.'.join(str(requirements('python', 'python')).split('.')[:2])
-            pinned  = requirements.pinned('python', 'python')
+            version = self.reqs('python', 'numpy')
+            pyvers  = '.'.join(str(self.reqs('python', 'python')).split('.')[:2])
+            pinned  = self.reqs.pinned('python', 'python')
             chan    = ""
             if pinned in (False, True):
                 pinned = ''
@@ -134,7 +136,7 @@ class CondaSetup: # pylint: disable=too-many-instance-attributes
             else:
                 pinned = '='   + pinned
 
-            nppinned  = requirements.pinned('python', 'numpy')
+            nppinned  = self.reqs.pinned('python', 'numpy')
             if nppinned in (True, False):
                 nppinned = ''
             elif '=' in nppinned:
@@ -145,15 +147,7 @@ class CondaSetup: # pylint: disable=too-many-instance-attributes
             else:
                 nppinned = '='  + nppinned
 
-
-            cmd = (
-                f'create --yes -n {self.envname} python={pyvers}{pinned}'
-                f' numpy>={version}{nppinned} {chan}'
-            )
-
-            if self.__ismin('numpy'):
-                cmd = cmd.replace('numpy>=', 'numpy=')
-
+            cmd = f'create --yes -n {self.envname} python={pyvers}{pinned}'
             Logs.info(cmd)
             self.__run(cmd)
         else:
