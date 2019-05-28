@@ -124,7 +124,6 @@ class CondaSetup: # pylint: disable=too-many-instance-attributes
     def __createenv(self):
         "create conda environment"
         if self.__run('list -n '+ self.envname):
-            version = self.reqs('python', 'numpy')
             pyvers  = '.'.join(str(self.reqs('python', 'python')).split('.')[:2])
             pinned  = self.reqs.pinned('python', 'python')
             chan    = ""
@@ -147,7 +146,10 @@ class CondaSetup: # pylint: disable=too-many-instance-attributes
             else:
                 nppinned = '='  + nppinned
 
-            cmd = f'create --yes -n {self.envname} python={pyvers}{pinned}'
+            cmd = (
+                f'create --yes -n {self.envname} '
+                f'python={pyvers}{pinned}{CHANNELS[1]}'
+            )
             Logs.info(cmd)
             self.__run(cmd)
         else:
