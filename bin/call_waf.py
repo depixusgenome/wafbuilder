@@ -11,11 +11,6 @@ ARGS = tuple(sys.argv)[2 if 'python' in sys.argv[0] else 1:]
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 import_module("shellvars").shell(sys.argv, None)
-os.environ['PREFIX'] = (
-    ('patch_' if '--patch' in ARGS else '')
-    +import_module("git").version()
-)
-
 
 FNAME = str(
     (

@@ -4,13 +4,14 @@
 import sys
 from pathlib import Path
 
-from waflib import TaskGen
+from waflib           import TaskGen
 from waflib.Configure import conf
 
-from ._python import condasetup as _condasetup
-from ._utils import CODE_PATH, copyfiles
-from .bokehcompiler import build_bokehjs
-from .modules import basecontext
+from ._python         import condasetup as _condasetup
+from ._utils          import CODE_PATH, copyfiles
+from .bokehcompiler   import build_bokehjs
+from .git             import version as _version
+from .modules         import basecontext
 
 def build_resources(bld):
     "install resources in installation directory"
@@ -149,10 +150,10 @@ def options_app(opt):
     "configure app options"
     grp = opt.add_option_group('Configuration options')
     grp.add_option(
-        '--ispatch',
+        '--fulldist',
         dest    = 'ispatch',
-        action  = 'store_true',
-        default = False,
+        action  = 'store_false',
+        default = True,
         help    = "Whether we are creating a patch or a full distribution"
     )
 
@@ -165,6 +166,11 @@ def configure_app(cnf, cmds = (), modules = (), jspaths = (), resources = ()):
     cnf.env.CODE_PATH         = CODE_PATH
     cnf.env.DISTRIBUTION_PATH = "distribution"
     cnf.env.ISPATCH           = cnf.options.ispatch
+    cnf.env.PREFIX            = str(
+        Path(str(cnf.bldnode))
+        /(('patch_' if cnf.options.ispatch else '')+_version())
+    )
+
     cnf.env.append_value("BOKEH_DEFAULT_MODULES", list(modules))
     cnf.env.append_value(
         "BOKEH_DEFAULT_JS_PATHS",
