@@ -66,9 +66,9 @@ def build_startupscripts(bld, name, scriptname):
             bld(**dict(
                 args,
                 target = bld.bldnode.find_or_declare("bin/"+name+("_debug" if debug else "")+ext),
-                start  = r'start /min' if debug else r"",
-                python = r'pythonw'    if debug else r"python",
-                pause  = "pause"       if debug else r""
+                start  = ""       if debug else r'start /min ',
+                python = "python" if debug else r'pythonw',
+                pause  = "pause"  if debug else r""
             ))
         elif not debug:
             bld(**args)

@@ -224,9 +224,17 @@ def copytask(tsk):
         shutil.copy2(tsk.inputs[0].abspath(),
                      tsk.outputs[0].abspath())
 
-def copyfiles(bld:Context, arg, items:Sequence):
+def copyfiles(bld:Context, arg, items:Sequence, install = False):
     "copy py modules to build root path"
-    if len(items) == 0 or bld.cmd != "build":
+    if len(items) == 0:
+        return
+
+    if bld.cmd != "build" and install:
+        bld.install_files(
+                bld.installcodepath(arg, direct = True),
+                items,
+                cwd            = bld.path,
+                relative_trick = True)
         return
 
     def _kword(_):

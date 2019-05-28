@@ -34,7 +34,7 @@ def check_nodejs_typescript(cnf, _, version):
 
 def build_typescript(bld:Context, name:str):
     "builds all coffee files"
-    copyfiles(bld, name, bld.path.ant_glob('**/*.ts'))
+    copyfiles(bld, name, bld.path.ant_glob('**/*.ts'), install = True)
 
 @requirements.addcheck
 def check_nodejs_coffeelint(cnf, name, version):
@@ -80,7 +80,8 @@ def coffeelint(bld):
 def build_coffeescript(bld:Context, name:str):
     "builds all coffee files"
     coffees = bld.path.ant_glob('**/*.coffee')
-    copyfiles(bld, name, coffees)
+    copyfiles(bld, name, coffees, install = True)
+
     if bld.cmd == 'build' and ('nodejs', 'coffeescript') in requirements and 'COFFEE' in bld.env:
         bld(source = coffees)
         if bld.options.DO_PY_LINTING:
