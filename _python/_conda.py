@@ -96,7 +96,10 @@ class CondaSetup: # pylint: disable=too-many-instance-attributes
                        default = '',
                        help    = "consider only these packages")
 
-    def __run(self, cmd):
+    def __run(self, cmd, log: bool = False):
+        if log:
+            Logs.pprint('YELLOW', '>> '+self._conda[0]+' '+cmd)
+
         try:
             subprocess.check_call(self._conda+cmd.split(' '),
                                   stdout=subprocess.DEVNULL,
@@ -146,12 +149,8 @@ class CondaSetup: # pylint: disable=too-many-instance-attributes
             else:
                 nppinned = '='  + nppinned
 
-            cmd = (
-                f'create --yes -n {self.envname} '
-                f'python={pyvers}{pinned}{CHANNELS[1]}'
-            )
-            Logs.info(cmd)
-            self.__run(cmd)
+            cmd = f'create --yes -n {self.envname} python={pyvers}{pinned}{CHANNELS[1]}'
+            self.__run(cmd, log = True)
         else:
             Logs.info("found env %s", self.envname)
 
@@ -162,13 +161,16 @@ class CondaSetup: # pylint: disable=too-many-instance-attributes
         "gets the version with pip"
         cur = subprocess.check_output([self.__pip(), 'show', name]).split(b'\n')[1]
         cur = cur.split(b':')[1].decode('utf-8').strip()
-        if LooseVersion(cur) < version:
-            return False
-        return True
+        if self.__ismin(name):
+            return LooseVersion(cur) == version
+        return LooseVersion(cur) >= version
 
     def __condaupdate(self, res, name, version):
         "updates a module with conda"
         if res.get(name, (0, '<pip>'))[1] == '<pip>':
+            return False
+
+        if isinstance(self.reqs.pinned('python', name), str):
             return False
 
         cmd = '-n '+self.envname+ ' ' + name
@@ -178,8 +180,8 @@ class CondaSetup: # pylint: disable=too-many-instance-attributes
         if res[name][1] not in ('defaults', ''):
             cmd += ' -c '+res[name][1]
 
-        if self.__run('install '+cmd+' --yes'):
-            self.__run('remove -n %s %s --yes' % (self.envname, name))
+        if self.__run('install '+cmd+' --yes', log = True):
+            self.__run('remove -n %s %s --yes' % (self.envname, name), log = True)
             return False
         return True
 
@@ -190,7 +192,7 @@ class CondaSetup: # pylint: disable=too-many-instance-attributes
         if version is not None:
             cmd += ('=' if self.__ismin(name) else '>=') + str(version)
 
-        pinned   = requirements.pinned('python', name)
+        pinned   = self.reqs.pinned('python', name)
         if '=' in str(pinned):
             channels = [pinned[pinned.rfind('=')+1:]]
             cmd     += '='+pinned[:pinned.rfind('=')]
@@ -199,7 +201,7 @@ class CondaSetup: # pylint: disable=too-many-instance-attributes
         cmd     += '"'
 
         for channel in channels:
-            if not self.__run('install ' + cmd + channel+ ' --yes'):
+            if not self.__run('install ' + cmd + channel+ ' --yes', log = True):
                 return True
             Logs.info("failed on channel '%s'", channel)
 
@@ -260,27 +262,19 @@ class CondaSetup: # pylint: disable=too-many-instance-attributes
             itms = {i: j for i, j in itms.items() if i in self.packages}
 
         for name, version in itms.items():
-            if name == 'python':
-                continue
-
+            req = self.reqs.pinned('python', name)
             Logs.info(
-                "checking: %s%s%s",
+                "checking: %s%s%s%s",
                 name,
                 '=' if self.__ismin(name) else '>=',
-                version
+                version,
+                '='+req if isinstance(req, str) else ''
             )
             if self.__isgood(name, version, res):
                 continue
 
             if self.__condaupdate(res, name, version):
                 continue
-
-            try:
-                if (self.__pipversion(name, version)
-                        and self.__ismin(name)):
-                    continue
-            except subprocess.CalledProcessError:
-                pass
 
             if (res.get(name, (0, 0))[1] != '<pip>'
                     and self.__condainstall(name, version)):
@@ -298,9 +292,9 @@ class CondaSetup: # pylint: disable=too-many-instance-attributes
     def __nodejs_run(self):
         "Installs nodejs modules"
         name  = self._nodejs
-        if name not in requirements:
+        if name not in self.reqs:
             return
-        itms  = requirements(name, runtimeonly = self.rtime)
+        itms  = self.reqs(name, runtimeonly = self.rtime)
         if len(self.packages):
             itms = {i: j for i, j in itms.items() if i in self.packages}
 
@@ -336,23 +330,23 @@ class CondaSetup: # pylint: disable=too-many-instance-attributes
                 continue
             cmd = npm+' install --global  %s' % info[0]
             if self.__ismin(info[0]):
-                cmd += '@'+requirements.version(self._nodejs, info[0])
+                cmd += '@'+self.reqs.version(self._nodejs, info[0])
             Logs.info(cmd)
             os.system(cmd)
 
     def __nodejs_req(self):
         name = self._nodejs
         if (
-                name in requirements
-                and ('python', name) not in requirements
+                name in self.reqs
+                and ('python', name) not in self.reqs
         ):
-            itms  = requirements(name, runtimeonly = self.rtime)
+            itms  = self.reqs(name, runtimeonly = self.rtime)
             if len(self.packages):
                 itms = {i: j for i, j in itms.items() if i in self.packages}
 
             if len(itms) > 0:
-                version = requirements.version(name, name)
-                requirements.require('python', name, version)
+                version = self.reqs.version(name, name)
+                self.reqs.require('python', name, version)
 
     def copyenv(self):
         "copies a environment"
@@ -373,12 +367,12 @@ class CondaSetup: # pylint: disable=too-many-instance-attributes
         cmd  = ' '.join(i+'='+j for i, j in chan.pop('').items())
         cmd += ' -p '+ self.copy
 
-        self.__run('create '+cmd+' --yes')
+        self.__run('create '+cmd+' --yes', log = True)
 
         for channel, items in chan.items():
             cmd  = ' '.join(i+'='+j for i, j in items.items())
             cmd += ' -p '+ self.copy + ' -c ' + channel
-            self.__run('install ' + cmd + ' --yes')
+            self.__run('install ' + cmd + ' --yes', log = True)
 
         if len(pips):
             if sys.platform.startswith('win'):

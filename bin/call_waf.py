@@ -19,8 +19,4 @@ FNAME = str(
 )
 
 sys.path.pop(0)
-
-if any(i == '-v' for i in sys.argv):
-    print("PREFIX="+os.environ['PREFIX'])
-    print("CONDA_DEFAULT_ENV="+os.environ['CONDA_DEFAULT_ENV'])
 subprocess.run([FNAME, *ARGS])
