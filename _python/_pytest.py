@@ -79,7 +79,7 @@ class PyTesting:
             os.environ.get('CONDA_DEFAULT_ENV', '-')
         )
         info("Path to os module: %s", os.__file__)
-        os.chdir(str(bld.bldnode))
+        os.chdir(cls.__outdir(bld))
         opt = bld.options
         if opt.TEST_HEADLESS:
             os.environ['DPX_TEST_HEADLESS'] = 'True'
@@ -101,7 +101,7 @@ class PyTesting:
     def html(cls, bld):
         "create the html"
         from   waflib.Logs   import info
-        os.chdir(str(bld.bldnode))
+        os.chdir(cls.__outdir(bld))
         opt  = bld.options
         gcda = any(Path(".").glob("./**/*.gcda"))
         info("Found gcda files at %s: %s", Path(".").resolve(), gcda)
@@ -127,7 +127,7 @@ class PyTesting:
     @classmethod
     def __lcov(cls, bld):
         "create lcov report"
-        cwd = Path(str(bld.bldnode)).stem
+        cwd = Path(cls.__outdir(bld)).stem
         opt = bld.options
         bld.cmd_and_log(
             cls.CAPTURE.format(output = "cppcoverage.info"),
@@ -143,3 +143,7 @@ class PyTesting:
         )
         with open(opt.TEST_COV+"/index.html", "w", encoding = "utf-8") as stream:
             print(cls.INDEX, file = stream)
+
+    @staticmethod
+    def __outdir(bld) -> str:
+        return str(getattr(bld, 'bldnode', getattr(bld, 'out_dir', 'build')))
