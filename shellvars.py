@@ -25,18 +25,24 @@ except ImportError:
     from git        import branch
 
 def _envnames(cnf):
-    return (
-        subprocess
-        .run(
-            cnf,
-            check  = True,
-            stdout = subprocess.PIPE,
-            stderr = subprocess.PIPE,
-        ).stdout
-        .decode('utf-8')
-        .strip()
-        .split('\n')
-    )
+    for i in (False, True):
+        try:
+            return (
+                subprocess
+                .run(
+                    cnf,
+                    check  = True,
+                    stdout = subprocess.PIPE,
+                    stderr = subprocess.PIPE,
+                    shell  = i
+                ).stdout
+                .decode('utf-8')
+                .strip()
+                .split('\n')
+            )
+        except FileNotFoundError:
+            pass
+    raise RuntimeError("Could not find conda environment names")
 
 ENV_BASE    = "base"
 ENV_BRANCH  = "branch"
@@ -98,7 +104,15 @@ def shellvars(cnf, defaults = None, **kwa)-> Tuple[Tuple[str, str]]:
     root = Path(avail[envname])
     if sys.platform.startswith("win"):
         binary = root
-        path   = f'{binary};{root/"Scripts"};{os.environ["PATH"]}'
+        path   = (
+            f'{binary};'
+            +''.join(f'{root/"Library"/i/"bin"};' for i in ('mingw-w64', 'usr', ''))
+            +''.join(f'{root/i};' for i in ('Scripts', 'bin'))
+            +';'.join(
+                i for i in os.environ["PATH"].split(';')
+                if 'condabin' in i or 'miniconda3' not in i
+            )
+        )
     else:
         binary = root/"bin"
         path   = f'{binary}:{os.environ["PATH"]}'

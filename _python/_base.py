@@ -27,8 +27,13 @@ except:
             vers = getattr(vers, '__version__', vers)
     except:
         import subprocess
+        cmd = ["conda", "list", NAME]
         try:
-            out = subprocess.check_output(["conda", "list", NAME]).strip().split(b"\\n")
+            try:
+                ret = subprocess.check_output(cmd)
+            except FileNotFoundError:
+                ret = subprocess.check_output(cmd, shell = True)
+            out = ret.strip().split(b"\\n")
             if len(out) == 4:
                 vers = next((i for i in out[-1].split(b" ")[1:] if i != b""), None)
                 if vers is not None:
