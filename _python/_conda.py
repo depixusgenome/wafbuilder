@@ -250,9 +250,10 @@ class CondaSetup: # pylint: disable=too-many-instance-attributes
         "Installs python modules"
         res  = self.__currentlist()
         itms = self.reqs('python', runtimeonly = self.rtime)
-        itms.update((i[len('python_'):], j)
-                    for i, j in self.reqs('cpp', runtimeonly = self.rtime).items()
-                    if i.startswith('python_'))
+        if 'cpp' in self.reqs:
+            itms.update((i[len('python_'):], j)
+                        for i, j in self.reqs('cpp', runtimeonly = self.rtime).items()
+                        if i.startswith('python_'))
 
         boost = Boost.getlibs()
         if boost:
