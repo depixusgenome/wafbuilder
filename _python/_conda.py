@@ -388,11 +388,9 @@ class CondaSetup: # pylint: disable=too-many-instance-attributes
         "Installs conda"
         self.__download()
         self.__createenv()
-        if not sys.platform.startswith("win"):
-            self.__nodejs_req()
+        self.__nodejs_req()
         self.__python_run()
-        if not sys.platform.startswith("win"):
-            self.__nodejs_run()
+        self.__nodejs_run()
 
 def condasetup(cnf:Context = None, **kwa):
     "installs / updates a conda environment"
