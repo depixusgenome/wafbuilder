@@ -96,14 +96,21 @@ class CondaSetup: # pylint: disable=too-many-instance-attributes
                        default = '',
                        help    = "consider only these packages")
 
-    def __run(self, cmd, log: bool = False):
+    def __run(self, cmd, log: bool = False, verbose = False):
         if log:
             Logs.pprint('YELLOW', '>> '+self._conda[0]+' '+cmd)
 
         try:
-            subprocess.check_call(self._conda+cmd.split(' '),
-                                  stdout=subprocess.DEVNULL,
-                                  stderr=subprocess.DEVNULL)
+            subprocess.check_call(
+                self._conda+cmd.split(' '),
+                **(
+                    dict() if verbose else
+                    dict(
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                    )
+                )
+            )
         except: # pylint: disable=bare-except
             return True
         return False
@@ -351,6 +358,7 @@ class CondaSetup: # pylint: disable=too-many-instance-attributes
 
     def copyenv(self):
         "copies a environment"
+        self.__nodejs_req()
         req = self.reqs('python', runtimeonly = self.rtime)
         req.update((i[len('python_'):], j)
                    for i, j in self.reqs('cpp', runtimeonly = self.rtime).items()
@@ -368,12 +376,12 @@ class CondaSetup: # pylint: disable=too-many-instance-attributes
         cmd  = ' '.join(i+'='+j for i, j in chan.pop('').items())
         cmd += ' -p '+ self.copy
 
-        self.__run('create '+cmd+' --yes', log = True)
+        self.__run('create '+cmd+' --yes', log = True, verbose = True)
 
         for channel, items in chan.items():
             cmd  = ' '.join(i+'='+j for i, j in items.items())
             cmd += ' -p '+ self.copy + ' -c ' + channel
-            self.__run('install ' + cmd + ' --yes', log = True)
+            self.__run('install ' + cmd + ' --yes', log = True, verbose = True)
 
         if len(pips):
             if sys.platform.startswith('win'):
