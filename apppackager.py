@@ -99,8 +99,9 @@ def build_doc(bld, scriptname):
         ),
         target = tgt
     )
+    print(str(tgt.parent), bld.installpath(path+f"/{scriptname}", direct = True))
     bld.install_files(
-        bld.installpath(path, direct = True),
+        bld.installpath(path+f"/{scriptname}", direct = True),
         tgt.parent.ant_glob("**/*.*"),
         cwd            = tgt.parent,
         relative_trick = True
