@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 u"git extraction functions"
 from   typing import Any # pylint: disable=unused-import
+from   pathlib import Path
 import os
 import subprocess
 
@@ -28,7 +29,10 @@ def origin() -> str:
     u"returns origin repo name"
     cmd = 'remote', 'get-url', 'origin' # type: Any
     out = _cmd(*cmd)
-    return out.replace('\\', '/').split('/')[-1].split('.')[0]
+    res = out.replace('\\', '/').split('/')[-1].split('.')[0]
+    if res:
+        return res
+    return Path(".").resolve().name # for Teamcity ...
 
 def lasthash(path = None) -> str:
     u"returns last commit hashtag"
