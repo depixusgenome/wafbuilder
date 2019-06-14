@@ -32,7 +32,11 @@ def origin() -> str:
     res = out.replace('\\', '/').split('/')[-1].split('.')[0]
     if res:
         return res
-    return Path(".").resolve().name # for Teamcity ...
+
+    # for Teamcity ...
+    if 'TEAMCITY_PROJET_NAME' in os.environ:
+        return os.environ['TEAMCITY_PROJET_NAME']
+    return Path(".").resolve().name 
 
 def lasthash(path = None) -> str:
     u"returns last commit hashtag"
