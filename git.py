@@ -24,6 +24,12 @@ def version(path = None) -> str:
         cmd   +=  ('--dirty=+',)
     return _cmd(*cmd)
 
+def origin() -> str:
+    u"returns origin repo name"
+    cmd = 'remote', 'get-url', 'origin' # type: Any
+    out = _cmd(*cmd)
+    return out.replace('\\', '/').split('/')[-1].split('.')[0]
+
 def lasthash(path = None) -> str:
     u"returns last commit hashtag"
     if path is not None:
