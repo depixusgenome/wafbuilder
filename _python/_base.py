@@ -27,7 +27,7 @@ except:
             vers = getattr(vers, '__version__', vers)
     except:
         import subprocess
-        cmd = ["conda", "list", NAME]
+        cmd = ["conda", "list", "-f", NAME]
         try:
             try:
                 ret = subprocess.check_output(cmd)
