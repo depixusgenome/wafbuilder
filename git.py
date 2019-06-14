@@ -34,8 +34,8 @@ def origin() -> str:
         return res
 
     # for Teamcity ...
-    if 'TEAMCITY_PROJET_NAME' in os.environ:
-        return os.environ['TEAMCITY_PROJET_NAME']
+    if 'TEAMCITY_PROJECT_NAME' in os.environ:
+        return os.environ['TEAMCITY_PROJECT_NAME']
     return Path(".").resolve().name 
 
 def lasthash(path = None) -> str:
