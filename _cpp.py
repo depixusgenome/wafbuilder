@@ -5,7 +5,7 @@ import sys
 import re
 import textwrap
 from   pathlib          import Path
-from typing             import Optional, List, Tuple
+from typing             import Optional, List, Tuple, Dict
 from distutils.version  import LooseVersion
 from waflib             import Utils,Errors
 from waflib.Configure   import conf
@@ -282,8 +282,8 @@ def check_cpp_compiler(cnf:Context, name:str, version:Optional[str]):
                   +' version '+curr
                   +' should be greater than '+version)
 
-@requirements.addcheck
-def check_cpp_gtest(cnf:Context, name:str, version:Optional[str]):
+def get_python_paths(cnf:Context) -> Dict[str, Path]:
+    "get the python path"
     rem = not getattr(cnf.env, 'PYTHON')
     if rem:
         cnf.find_program("python", var="PYTHON", mandatory=False)
@@ -292,13 +292,21 @@ def check_cpp_gtest(cnf:Context, name:str, version:Optional[str]):
         check_cpp_default(cnf, name, version)
         return
 
-    path = Path(cnf.env["PYTHON"][0]).parent
+    root = Path(cnf.env["PYTHON"][0]).parent
     if rem:
         del cnf.env['PYTHON']
 
-    if sys.platform.startswith("win32"):
-        path /= "Library"
+    path = root/'Library' if sys.platform.startswith('win') else root.parent
+    return dict(
+        root = root.resolve(),
+        inc  = (path/'include').resolve(),
+        lib  = (path/'lib').resolve(),
+        bin  = (path/'bin').resolve()
+    )
 
+@requirements.addcheck
+def check_cpp_gtest(cnf:Context, name:str, version:Optional[str]):
+    path = get_python_paths(cnf)['lib']
     vers = libmain = lib = inc = None
     cnf.start_msg(f"Checking for conda module {name} (>= {version})")
     for i in range(3):
@@ -335,33 +343,48 @@ def check_cpp_gtest(cnf:Context, name:str, version:Optional[str]):
     cnf.fatal('The %s version does not satisfy the requirements'%name)
     cnf.end_msg(False)
 
+PYTHON_MODULE_LIBS = {
+    'ffmpeg': ["avformat", "avcodec", "avutil"]
+}
+
 @requirements.addcheck
 def check_cpp_default(cnf:Context, name:str, version:Optional[str]):
     u"Adds a requirement checker"
     if name.startswith('boost'):
         return
     if name.startswith('python_'):
-        base = name[len('python_'):]
-        cond = 'ver >= num('+str(version).replace('.',',')+')'
+        base  = name[len('python_'):]
+        cond  = 'ver >= num('+str(version).replace('.',',')+')'
         cnf.check_python_module(base, condition = cond)
-
-        if sys.platform.startswith('win'):
-            root    = (Path(cnf.env.INCLUDES_PYEXT[0])/'..'/'Library').resolve()
-            inc     = str((root/'include').resolve())
-            lib     = str((root/'lib').resolve())
-        else:
-            inc      = cnf.env.INCLUDES_PYEXT[0]
-            lib      = cnf.env.LIBPATH_PYEXT[0] if len(cnf.env.LIBPATH_PYEXT) else ""
-
-        libflag  = "-L" if len(lib) else ""
-        line = f' -I{inc} -I{Path(inc).parent} {libflag}{lib} -l{base}'
-        if not sys.platform.startswith('win'):
+        paths    = get_python_paths(cnf)
+        lib, inc = paths['lib'], paths['inc']
+        line     = f' -I{inc} -I{Path(inc).parent} -L{lib}'
+        iswin    = sys.platform.startswith('win')
+        if not iswin:
             line += ' -lm'
-        libs = tuple(pre+base+suf for pre in ('', 'lib') for suf in ('.so', '.dll', '.lib'))
-        if not any((Path(lib) / name).exists() for name in libs):
-            line = line.replace('-l'+base, '')
+
+        bases = set(PYTHON_MODULE_LIBS.get(base, (base,)))
+        for name in set(bases):
+            for fullname in (pre+name+suf for pre in ('', 'lib') for suf in ('.so', '.dll', '.lib')):
+                if (Path(lib) / fullname).exists():
+                    line  += f' -l{name}'
+                    bases -=  {name}
+                    break
+
+        for name in bases:
+            for lib in (pre+name+'.a' for pre in ('', 'lib')):
+                if (Path(lib) / fullname).exists():
+                    if '-Wl,-Bstatic' not in line:
+                        line += f' -Wl,-Bstatic -L{lib}'
+                    line += f' l{name}'
+                    break
 
         cnf.parse_flags(line, uselib_store = base)
+        for suf in ('', '.exe', '.bat', '.sh'):
+            test = (paths['bin']/base).with_suffix(suf)
+            if test.exists():
+                setattr(cnf.env, f"BIN_{base}",  [str(test)])
+                cnf.env.append_value(f'DEFINES_{base}', f'BIN_{base}="{test}"')
     else:
         cnf.check_cfg(package         = name,
                       uselib_store    = name,
