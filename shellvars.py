@@ -79,7 +79,7 @@ def shellvars(cnf, defaults = None, **kwa)-> Tuple[Tuple[str, str]]:
     if not defaults:
         defaults = ENV_DEFAULT
     envname = condaenvname(cnf, default = defaults[0], **kwa)
-    print("condaenv",cnf, default[0], envname)
+    print("condaenv",cnf, defaults, envname)
     conda   = kwa.get('conda', None)
     if not conda and hasattr(cnf, 'env'):
         conda = cnf.env.CONDA
