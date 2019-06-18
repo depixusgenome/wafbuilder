@@ -79,8 +79,8 @@ def shellvars(cnf, defaults = None, **kwa)-> Tuple[Tuple[str, str]]:
     if not defaults:
         defaults = ENV_DEFAULT
     envname = condaenvname(cnf, default = defaults[0], **kwa)
-    print("condaenv",cnf, defaults, envname)
     conda   = kwa.get('conda', None)
+    print("condaenv",cnf, defaults, envname)
     if not conda and hasattr(cnf, 'env'):
         conda = cnf.env.CONDA
         if conda and isinstance(conda, (list, tuple)):
@@ -91,6 +91,7 @@ def shellvars(cnf, defaults = None, **kwa)-> Tuple[Tuple[str, str]]:
     avail = {
         i.strip()[:i.find(' ')]: i.strip()[i.rfind(' ')+1:]
         for i in _envnames([conda, 'info', '-e'])
+        if i[0] != '#'
     }
 
     print(envname, avail)
