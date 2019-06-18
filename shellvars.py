@@ -79,6 +79,7 @@ def shellvars(cnf, defaults = None, **kwa)-> Tuple[Tuple[str, str]]:
     if not defaults:
         defaults = ENV_DEFAULT
     envname = condaenvname(cnf, default = defaults[0], **kwa)
+    print("condaenv",cnf, default[0], envname)
     conda   = kwa.get('conda', None)
     if not conda and hasattr(cnf, 'env'):
         conda = cnf.env.CONDA
@@ -92,15 +93,19 @@ def shellvars(cnf, defaults = None, **kwa)-> Tuple[Tuple[str, str]]:
         for i in _envnames([conda, 'info', '-e'])
     }
 
+    print(envname, avail)
     if envname not in avail:
         for i in defaults:
             envname = i
             if envname == ENV_BRANCH:
                 envname = branch()
+                print("branch", envname)
             if envname in avail:
+                print("found", envname)
                 break
         else:
             envname = ENV_BASE
+            print("not found", envname)
     root = Path(avail[envname])
     if sys.platform.startswith("win"):
         binary = root
