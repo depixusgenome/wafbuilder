@@ -1,7 +1,6 @@
 #!/usr/bin/env python2
 # -*- coding: utf-8 -*-
 "All *basic* python related details"
-import os
 from pathlib            import Path
 from typing             import Sequence, List, Tuple
 from waflib.Configure   import conf
@@ -125,7 +124,7 @@ def build_python(bld:Context, name:str, version:str, **kwargs):
         return
 
     csrc    = kwargs.get('python_cpp', bld.path.ant_glob('**/*.cpp'))
-    pysrc   = bld.path.ant_glob('**/*.py')
+    pysrc   = [i for i in bld.path.ant_glob('**/*.py') if Path(str(i)).stem[0] !='.']
     buildpyext(bld, name, version, pysrc, csrc, **kwargs)
     buildpymod(bld, name, pysrc, **kwargs)
     if bld.cmd == 'build':
