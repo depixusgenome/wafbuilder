@@ -201,7 +201,7 @@ class CondaSetup: # pylint: disable=too-many-instance-attributes
 
         pinned   = self.reqs.pinned('python', name)
         if '=' in str(pinned):
-            channels = [pinned[pinned.rfind('=')+1:]]
+            channels = [' -c '+pinned[pinned.rfind('=')+1:]]
             cmd     += '='+pinned[:pinned.rfind('=')]
         elif isinstance(pinned, str):
             cmd    += '='+pinned
