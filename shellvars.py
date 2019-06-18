@@ -126,15 +126,22 @@ def shellvars(cnf, defaults = None, **kwa)-> Tuple[Tuple[str, str]]:
 
 def info():
     "print info"
-    print("\nCOMPILERS *****************")
-    subprocess.check_call(['clang', '--version'])
-    print("")
-    subprocess.check_call(['g++-8', '--version'])
-    print("\nCONDA INFO *********************")
-    subprocess.check_call(['conda', 'info', '-a'], shell = False)
-
-    print("\nCONDA PACKAGES *********************")
-    subprocess.check_call(['conda', 'list', '--explicit'], shell = False)
+    print("ENV **********************")
+    print(f"CONDA_DEFAULT_ENV: {os.environ.get('CONDA_DEFAULT_ENV', '')}")
+    print(f"PATH: {os.environ.get('PATH', '')}")
+    for txt, cmd in (
+            ("\nCOMPILERS *****************",           ['clang', '--version']),
+            ("",                                        ['g++-8', '--version']),
+            ("\nCONDA INFO *********************",      ['conda', 'info', '-a']),
+            ("\nCONDA PACKAGES *********************",  ['conda', 'list', '--explicit']),
+    ):
+        out = subprocess.run(cmd, capture_output = True)
+        print(txt)
+        if out.stdout:
+            print(out.stdout.decode('utf-8'))
+        if out.stderr:
+            print(out.stderr.deconde('utf-8'), file = sys.stderr)
+        out.check_returncode()
 
 def shell(cnf, output = 'stdout', shells =  ('build', 'configure', 'test'), **kwa):
     """
