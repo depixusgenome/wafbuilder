@@ -144,7 +144,7 @@ def info():
             print(out.stderr.deconde('utf-8'), file = sys.stderr)
         out.check_returncode()
 
-def shell(cnf, output = 'stdout', shells =  ('build', 'configure', 'test'), **kwa):
+def shell(cnf, output = 'stdout', shells =  ('build', 'configure', 'test', 'html'), **kwa):
     """
     updates python shell vars to update
 
