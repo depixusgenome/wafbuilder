@@ -513,40 +513,44 @@ def cpp_compiler_name(cnf:Context):
 
     return cnf.env['COMPILER_CXX']+"-"+str(curr)
 
-if not sys.platform.startswith("win"):
-    @feature('c','cxx','includes')
-    @after_method('apply_incpaths')
-    def apply_sysincpaths(self):
-        "add system args to specific includes"
-        sysitems: List[str] = []
-        for i in self.env.SYS_INCS:
-            itms = getattr(self.env, f'INCLUDES_{i}')
-            if isinstance(itms, (list, tuple)):
-                sysitems.extend(itms)
-            else:
-                sysitems.append(itms)
+@feature('c','cxx','includes')
+@after_method('apply_incpaths')
+def apply_sysincpaths(self):
+    "add system args to specific includes"
+    sysitems: List[str] = []
+    for i in self.env.SYS_INCS:
+        itms = getattr(self.env, f'INCLUDES_{i}')
+        if isinstance(itms, (list, tuple)):
+            sysitems.extend(itms)
+        else:
+            sysitems.append(itms)
 
-        cwd      = self.get_cwd()
-        sysitems = [ str(self.bld.root.make_node(i).path_from(cwd)) for i in sysitems]
+    cwd      = self.get_cwd()
+    sysitems = [ str(self.bld.root.make_node(i).path_from(cwd)) for i in sysitems]
 
-        self.env.INCPATHS= [
-            str(x)
-            for x in self.env.INCPATHS
-        ]
+    self.env.INCPATHS= [
+        str(x)
+        for x in self.env.INCPATHS
+    ]
 
-        self.env.INCPATHS= [
-            ('SYSTEM' if x in sysitems else '') + x
-            for x in self.env.INCPATHS
-        ]
+    self.env.INCPATHS= [
+        ('SYSTEM' if x in sysitems else '') + x
+        for x in self.env.INCPATHS
+    ]
 
-    from waflib.Task import Task
-    def exec_command(self,cmd, __old__ = Task.exec_command, **kw):
-        "execute cmd"
-        if isinstance(cmd, list):
-            old = list(cmd)
-            cmd.clear()
-            repl = '/external:I' if sys.platform.startswith('win') else '-isystem'
-            cmd.extend(i.replace('-ISYSTEM', repl) for i in old)
-        return __old__(self, cmd, **kw)
-    Task.exec_command = exec_command
+from waflib.Task import Task
+def exec_command(self,cmd, __old__ = Task.exec_command, **kw):
+    "execute cmd"
+    if isinstance(cmd, list) and any('ISYSTEM' in i for i in cmd):
+        old = list(cmd)
+        cmd.clear()
+        if sys.platform.startswith('win'):
+            cmd.append(old[0])
+            cmd.append('/experimental:external')
+            cmd.append('/external:W0')
+            cmd.extend(i.replace('/ISYSTEM', '/external:I') for i in old[1:])
+        else:
+            cmd.extend(i.replace('-ISYSTEM', '-isystem') for i in old)
+    return __old__(self, cmd, **kw)
+Task.exec_command = exec_command
 addmissing(locals())
