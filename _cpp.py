@@ -11,11 +11,9 @@ from waflib             import Utils,Errors
 from waflib.Configure   import conf
 from waflib.Context     import Context
 from waflib.TaskGen     import after_method,feature
-from ._utils            import (YES, runall, addmissing,
-                                Make, copyargs, copyroot, loading)
+from ._utils            import YES, runall, addmissing, Make, loading
 from ._requirements     import REQ as requirements
 from .git               import (
-    version        as _gitversion,
     lasthash       as _gitlasthash,
     isdirty        as _gitisdirty,
     lasttimestamp  as _gitlasttimestamp
@@ -97,8 +95,7 @@ class Flags(Make):
                     - a '+' as first character will be replaced by '{cxxflags}.
                     - '+coverage' will be replaced by '{OPTIONS['+coverage']['g++']['cxx']}'.
                     - '+sanitize' will be replaced by '{OPTIONS['+sanitize']['g++']['cxx']}'.
-                '''
-            )
+            ''')
         )
 
         copt.add_option('--linkflags',
@@ -205,23 +202,7 @@ class Boost(Make):
             return
 
         if not cnf.options.boost_includes and not cnf.options.boost_libs:
-            rem = 'PYTHON' not in cnf.env
-            if rem:
-                cnf.find_program("python", var="PYTHON", mandatory=False)
-            if 'PYTHON' in cnf.env:
-                path = Path(cnf.env["PYTHON"][0]).parent
-
-                if sys.platform.startswith("win32"):
-                    path /= "Library"
-
-                for i in range(3):
-                    if (path/"include"/"boost").exists() and (path/"lib").exists():
-                        cnf.options.boost_includes = str(path/"include")
-                        cnf.options.boost_libs     = str(path/"lib")
-                        break
-                    path = path.parent
-            if rem:
-                del cnf.env['PYTHON']
+            cls.__getboostfromconda(cnf)
 
         cnf.check_boost(lib = ' '.join(libs-set(cls._H_ONLY)), mandatory = True)
         if 'LIB_BOOST' not in cnf.env:
@@ -242,6 +223,26 @@ class Boost(Make):
         if LooseVersion(cnf.env.BOOST_VERSION.replace('_', '.')) < vers:
             cnf.fatal('Boost version is too old: %s < %s'
                       % (str(vers), str(cnf.env.BOOST_VERSION)))
+
+    @staticmethod
+    def __getboostfromconda(cnf:Context):
+        rem = 'PYTHON' not in cnf.env
+        if rem:
+            cnf.find_program("python", var="PYTHON", mandatory=False)
+        if 'PYTHON' in cnf.env:
+            path = Path(cnf.env["PYTHON"][0]).parent
+
+            if sys.platform.startswith("win32"):
+                path /= "Library"
+
+            for _ in range(3):
+                if (path/"include"/"boost").exists() and (path/"lib").exists():
+                    cnf.options.boost_includes = str(path/"include")
+                    cnf.options.boost_libs     = str(path/"lib")
+                    break
+                path = path.parent
+        if rem:
+            del cnf.env['PYTHON']
 
 def toload(cnf:Context):
     u"returns all features needed by cpp"
@@ -282,7 +283,7 @@ def check_cpp_compiler(cnf:Context, name:str, version:Optional[str]):
                   +' version '+curr
                   +' should be greater than '+version)
 
-def get_python_paths(cnf:Context) -> Dict[str, Path]:
+def get_python_paths(cnf:Context, name:str, version: Optional[str]) -> Dict[str, Path]:
     "get the python path"
     rem = not getattr(cnf.env, 'PYTHON')
     if rem:
@@ -290,7 +291,6 @@ def get_python_paths(cnf:Context) -> Dict[str, Path]:
 
     if not getattr(cnf.env, 'PYTHON'):
         check_cpp_default(cnf, name, version)
-        return
 
     root = Path(cnf.env["PYTHON"][0]).parent
     if rem:
@@ -306,7 +306,8 @@ def get_python_paths(cnf:Context) -> Dict[str, Path]:
 
 @requirements.addcheck
 def check_cpp_gtest(cnf:Context, name:str, version:Optional[str]):
-    path = get_python_paths(cnf)['lib']
+    "check for gtest"
+    path = get_python_paths(cnf, name, version)['lib']
     vers = libmain = lib = inc = None
     cnf.start_msg(f"Checking for conda module {name} (>= {version})")
     for i in range(3):
@@ -347,44 +348,53 @@ PYTHON_MODULE_LIBS = {
     'ffmpeg': ["avformat", "avcodec", "avutil"]
 }
 
+def _check_cpp_python(cnf:Context, name:str, version:Optional[str]):
+    base     = name[len('python_'):]
+    cond     = 'ver >= num('+str(version).replace('.',',')+')'
+    cnf.check_python_module(base, condition = cond)
+    paths    = get_python_paths(cnf, name, version)
+    lib, inc = paths['lib'], paths['inc']
+    line     = f' -I{inc} -I{Path(inc).parent} -L{lib}'
+    iswin    = sys.platform.startswith('win')
+    if not iswin:
+        line += ' -lm'
+
+    bases    = set(PYTHON_MODULE_LIBS.get(base, (base,)))
+    fullname = "--dummy--"
+    for basename in set(bases):
+        for fullname in (
+                pre+basename+suf
+                for pre in ('', 'lib')
+                for suf in ('.so', '.dll', '.lib')
+        ):
+            if (Path(lib) / fullname).exists():
+                line  += f' -l{basename}'
+                bases -=  {basename}
+                break
+
+    for basename in bases:
+        for lib in (pre+basename+'.a' for pre in ('', 'lib')):
+            if (Path(lib) / fullname).exists():
+                if '-Wl,-Bstatic' not in line:
+                    line += f' -Wl,-Bstatic -L{lib}'
+                line += f' l{basename}'
+                break
+
+    cnf.parse_flags(line, uselib_store = base)
+    for suf in ('', '.exe', '.bat', '.sh'):
+        test = (paths['bin']/base).with_suffix(suf)
+        if test.exists():
+            setattr(cnf.env, f"BIN_{base}",  [str(test)])
+            cnf.env.append_value(f'DEFINES_{base}', f'BIN_{base}="{test}"')
+
 @requirements.addcheck
 def check_cpp_default(cnf:Context, name:str, version:Optional[str]):
     u"Adds a requirement checker"
     if name.startswith('boost'):
         return
+
     if name.startswith('python_'):
-        base  = name[len('python_'):]
-        cond  = 'ver >= num('+str(version).replace('.',',')+')'
-        cnf.check_python_module(base, condition = cond)
-        paths    = get_python_paths(cnf)
-        lib, inc = paths['lib'], paths['inc']
-        line     = f' -I{inc} -I{Path(inc).parent} -L{lib}'
-        iswin    = sys.platform.startswith('win')
-        if not iswin:
-            line += ' -lm'
-
-        bases = set(PYTHON_MODULE_LIBS.get(base, (base,)))
-        for name in set(bases):
-            for fullname in (pre+name+suf for pre in ('', 'lib') for suf in ('.so', '.dll', '.lib')):
-                if (Path(lib) / fullname).exists():
-                    line  += f' -l{name}'
-                    bases -=  {name}
-                    break
-
-        for name in bases:
-            for lib in (pre+name+'.a' for pre in ('', 'lib')):
-                if (Path(lib) / fullname).exists():
-                    if '-Wl,-Bstatic' not in line:
-                        line += f' -Wl,-Bstatic -L{lib}'
-                    line += f' l{name}'
-                    break
-
-        cnf.parse_flags(line, uselib_store = base)
-        for suf in ('', '.exe', '.bat', '.sh'):
-            test = (paths['bin']/base).with_suffix(suf)
-            if test.exists():
-                setattr(cnf.env, f"BIN_{base}",  [str(test)])
-                cnf.env.append_value(f'DEFINES_{base}', f'BIN_{base}="{test}"')
+        _check_cpp_python(cnf, name, version)
     else:
         cnf.check_cfg(package         = name,
                       uselib_store    = name,
@@ -535,7 +545,8 @@ if not sys.platform.startswith("win"):
         if isinstance(cmd, list):
             old = list(cmd)
             cmd.clear()
-            cmd.extend(i.replace('-ISYSTEM', '-isystem') for i in old)
+            repl = '/external:I' if sys.platform.startswith('win') else '-isystem'
+            cmd.extend(i.replace('-ISYSTEM', repl) for i in old)
         return __old__(self, cmd, **kw)
     Task.exec_command = exec_command
 addmissing(locals())
