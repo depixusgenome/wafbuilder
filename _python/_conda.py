@@ -263,7 +263,7 @@ class CondaSetup: # pylint: disable=too-many-instance-attributes
                         if i.startswith('python_'))
 
         boost = Boost.getlibs()
-        if boost:
+        if boost[0]:
             itms["boost"] = boost[-1]
 
         if len(self.packages):
