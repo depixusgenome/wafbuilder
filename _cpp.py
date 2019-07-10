@@ -10,6 +10,7 @@ from distutils.version  import LooseVersion
 from waflib             import Utils,Errors
 from waflib.Configure   import conf
 from waflib.Context     import Context
+from waflib.Task        import Task
 from waflib.TaskGen     import after_method,feature
 from ._utils            import YES, runall, addmissing, Make, loading
 from ._requirements     import REQ as requirements
@@ -39,8 +40,9 @@ FLAGS           = {'/std:c++14': '-std=c++14',
                   }
 
 DEFAULT_CXX = {
-    **dict.fromkeys(('g++', 'clang++', 'linux'), '-std=c++17 -g'),
-    **dict.fromkeys(('msvc',),                   '/std:c++17 /EHsc')
+    'clang++': '-std=c++17 -g -fsized-deallocation',
+    **dict.fromkeys(('g++', 'linux'), '-std=c++17 -g'),
+    **dict.fromkeys(('msvc',),        '/std:c++17 /EHsc')
 }
 
 OPTIONS = {
@@ -70,11 +72,13 @@ def _isrequired():
 
 class Flags(Make):
     "deal with cxx/ld flags"
-    @classmethod
-    def defaultcxx(cls) -> str:
+    @staticmethod
+    def defaultcxx(cnf) -> str:
         "return the default cxx"
-        return DEFAULT_CXX["msvc" if sys.platform.startswith('win') else 'linux']
-
+        name = cnf.env['COMPILER_CXX'] if hasattr(cnf, 'env') else None
+        if name not in DEFAULT_CXX:
+            return DEFAULT_CXX["msvc" if sys.platform.startswith('win') else 'linux']
+        return DEFAULT_CXX[name]
 
     @classmethod
     def options(cls, opt):
@@ -83,7 +87,7 @@ class Flags(Make):
             return
 
         copt     = opt.add_option_group(CXX_OPTION_GROUP)
-        cxxflags = cls.defaultcxx()
+        cxxflags = cls.defaultcxx(opt)
 
         copt.add_option(
             '--cxxflags',
@@ -148,7 +152,7 @@ class Flags(Make):
 
         # add default flags
         if cxx[0] == "+":
-            cxx = cls.defaultcxx().strip()+" "+cxx[1:]
+            cxx = cls.defaultcxx(cnf).strip()+" "+cxx[1:]
 
         # add warnings
         cxx  +=  ' ' + ' '.join(WARNINGS.get(name, WARNINGS[...]))
@@ -538,7 +542,6 @@ def apply_sysincpaths(self):
         for x in self.env.INCPATHS
     ]
 
-from waflib.Task import Task
 def exec_command(self,cmd, __old__ = Task.exec_command, **kw):
     "execute cmd"
     if isinstance(cmd, list) and any('ISYSTEM' in i for i in cmd):
