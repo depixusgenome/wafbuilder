@@ -224,6 +224,7 @@ class Boost(Make):
                 else:
                     raise KeyError(f"missing $path/lib$i")
             cnf.env["LIB_BOOST"] = good
+        cnf.env['DEFINES_BOOST']= ['HAVE_BOOST=1']
         if LooseVersion(cnf.env.BOOST_VERSION.replace('_', '.')) < vers:
             cnf.fatal('Boost version is too old: %s < %s'
                       % (str(vers), str(cnf.env.BOOST_VERSION)))
