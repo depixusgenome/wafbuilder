@@ -40,7 +40,7 @@ FLAGS           = {'/std:c++14': '-std=c++14',
                   }
 
 DEFAULT_CXX = {
-    'clang++': '-std=c++17 -g -fsized-deallocation',
+    'clang++': '-std=c++17 -g -fsized-deallocation -fvisibility=hidden',
     **dict.fromkeys(('g++', 'linux'), '-std=c++17 -g'),
     **dict.fromkeys(('msvc',),        '/std:c++17 /EHsc')
 }
