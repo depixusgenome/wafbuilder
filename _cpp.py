@@ -8,7 +8,7 @@ from   pathlib          import Path
 from typing             import Optional, List, Tuple, Dict
 from distutils.version  import LooseVersion
 from waflib             import Utils,Errors
-from waflib.Configure   import conf
+from waflib.Configure   import conf, ConfigurationContext
 from waflib.Context     import Context
 from waflib.Task        import Task
 from waflib.TaskGen     import after_method,feature
@@ -39,6 +39,9 @@ FLAGS           = {'/std:c++14': '-std=c++14',
                    '/EHsc':      '',
                   }
 
+DEFAULT_AR = {
+    'clang++': ['llvm-ar-9', 'llvm-ar-8', 'llvm-ar-7', 'ar', 'llvm-ar'],
+}
 DEFAULT_CXX = {
     'clang++': '-std=c++17 -g -fsized-deallocation -fvisibility=hidden',
     **dict.fromkeys(('g++', 'linux'), '-std=c++17 -g'),
@@ -260,6 +263,12 @@ def toload(cnf:Context):
 
     if ('cpp', 'python_.*') in requirements:
         load += ' python'
+
+    if isinstance(cnf, ConfigurationContext):
+        name = cnf.options.check_cxx_compiler
+        if name in DEFAULT_AR:
+            # circumventing a bug in llvm-ar & jupyter ...
+            cnf.find_program(DEFAULT_AR[name], var="AR")
 
     return loading(cnf, ' '.join((load, Boost.toload(cnf))))
 
