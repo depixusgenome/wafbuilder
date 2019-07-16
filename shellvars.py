@@ -139,6 +139,9 @@ def info():
     print("ENV **********************")
     print(f"CONDA_DEFAULT_ENV: {os.environ.get('CONDA_DEFAULT_ENV', '')}")
     print(f"PATH: {os.environ.get('PATH', '')}")
+    print("OTHER **********************")
+    print(f"ORIGIN: {origin()}")
+    print(f"BRANCH: {branch()}")
     for txt, cmd in (
             ("\nCOMPILERS *****************",           ['clang', '--version']),
             ("",                                        ['g++-8', '--version']),
