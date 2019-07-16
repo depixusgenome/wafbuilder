@@ -47,7 +47,7 @@ def _envnames(cnf):
 ENV_BASE    = "base"
 ENV_BRANCH  = "branch"
 ENV_ORIGIN  = "origin"
-ENV_DEFAULT = [ENV_BRANCH, ENV_ORIGIN, "master", "base"]
+ENV_DEFAULT = [ENV_ORIGIN, ENV_BRANCH, "master", "base"]
 def condaenvname(cnf, default = ENV_BRANCH, **kwa):
     "get the env name"
     if isinstance(cnf, (list, tuple)):
@@ -97,16 +97,17 @@ def shellvars(cnf, defaults = None, **kwa)-> Tuple[Tuple[str, str]]:
         if i[0] != '#' and ' ' in i.strip()
     }
 
+    brch = branch()
     orig = origin().lower()
     if envname not in avail:
         for i in defaults:
             envname = (
-                branch() if i == ENV_BRANCH else
-                orig     if i == ENV_ORIGIN else
+                brch if i == ENV_BRANCH else
+                orig if i == ENV_ORIGIN else
                 i
             )
-            if i == ENV_BRANCH and envname == 'master' and orig in avail:
-                envname = orig
+            if i == ENV_ORIGIN and brch in avail and brch != 'master':
+                envname = brch
             if envname in avail:
                 break
         else:
