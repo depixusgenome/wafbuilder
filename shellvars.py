@@ -20,9 +20,9 @@ import subprocess
 
 from typing         import Tuple
 try:
-    from .git       import branch
+    from .git       import branch, origin
 except ImportError:
-    from git        import branch
+    from git        import branch, origin
 
 def _envnames(cnf):
     for i in (False, True):
@@ -46,7 +46,8 @@ def _envnames(cnf):
 
 ENV_BASE    = "base"
 ENV_BRANCH  = "branch"
-ENV_DEFAULT = [ENV_BRANCH, "master", "base"]
+ENV_ORIGIN  = "origin"
+ENV_DEFAULT = [ENV_BRANCH, ENV_ORIGIN, "master", "base"]
 def condaenvname(cnf, default = ENV_BRANCH, **kwa):
     "get the env name"
     if isinstance(cnf, (list, tuple)):
@@ -72,12 +73,15 @@ def condaenvname(cnf, default = ENV_BRANCH, **kwa):
 
     if envname.lower() == ENV_BRANCH:
         envname = branch()
+    if envname.lower() == ENV_ORIGIN:
+        envname = origin().lower()
     return envname
 
 def shellvars(cnf, defaults = None, **kwa)-> Tuple[Tuple[str, str]]:
     "return a script for setting the path"
     if not defaults:
         defaults = ENV_DEFAULT
+
     envname = condaenvname(cnf, default = defaults[0], **kwa)
     conda   = kwa.get('conda', None)
     if not conda and hasattr(cnf, 'env'):
@@ -93,11 +97,16 @@ def shellvars(cnf, defaults = None, **kwa)-> Tuple[Tuple[str, str]]:
         if i[0] != '#' and ' ' in i.strip()
     }
 
+    orig = origin().lower()
     if envname not in avail:
         for i in defaults:
-            envname = i
-            if envname == ENV_BRANCH:
-                envname = branch()
+            envname = (
+                branch() if i == ENV_BRANCH else
+                orig     if i == ENV_ORIGIN else
+                i
+            )
+            if i == ENV_BRANCH and envname == 'master' and orig in avail:
+                envname = orig
             if envname in avail:
                 break
         else:
