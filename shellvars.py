@@ -189,16 +189,6 @@ def shell(cnf, output = 'stdout', shells =  ('build', 'configure', 'test', 'html
 
         elif any(i in cnf for i in shells):
             try:
-                envname = condaenvname(cnf, **kwa)
-                if envname == 'unspecified':
-                    for i in _envnames([sys.executable, *cnf[:cnf.index("waf")+1], "condaenvname"]):
-                        if i.startswith("CONDA_ENV_NAME:"):
-                            envname = i.split(":")[1].strip()
-                            break
-                    else:
-                        envname = ENV_BRANCH
-
-                    cnf = list(cnf)+["-e", envname]
                 return shell(cnf, 'shell', **kwa)
             except KeyError:
                 return ""
