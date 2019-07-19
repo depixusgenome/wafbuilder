@@ -12,6 +12,7 @@ def _cmd(*args) -> str:
                                         stderr = subprocess.DEVNULL)
                 .strip().decode('utf-8'))
     else:
+        print('--',Path(".").resolve())
         return ''
 
 def version(path = None) -> str:
