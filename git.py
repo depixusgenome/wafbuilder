@@ -12,7 +12,6 @@ def _cmd(*args) -> str:
                                         stderr = subprocess.DEVNULL)
                 .strip().decode('utf-8'))
     else:
-        print('--',Path(".").resolve())
         return ''
 
 def version(path = None) -> str:
@@ -61,7 +60,10 @@ def lastauthor() -> str:
 
 def branch() -> str:
     u"returns current branch"
-    return _cmd('rev-parse', '--abbrev-ref', 'HEAD')
+    out = _cmd('rev-parse', '--abbrev-ref', 'HEAD')
+    if 'TEAMCITY_BRANCH_NAME' in os.environ and not out:
+        return os.environ['TEAMCITY_BRANCH_NAME']
+    return out
 
 def isdirty(path = None) -> bool:
     u"returns whether we're sitting in-between tags"
