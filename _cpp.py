@@ -427,7 +427,7 @@ def build_cpp(bld:Context, name:str, version:str, ignore = None, **kwargs):
     )
     csrc = [
         i
-        for i in bld.path.ant_glob('**/*.cpp', exclude = kwargs.get('python_cpp', []))
+        for i in bld.path.ant_glob('**/*.cpp', excl = kwargs.get('exclude', []))
         if not any(str(i).startswith(j) for j in rem)
     ]
     if len(csrc) == 0:

@@ -104,8 +104,15 @@ def make(glob = None, **kw):
         vers = glob['VERSION']
         kwa  = dict(kw)
         kwa .pop('builders', None)
+        spe  = {
+            name: kwa.pop(name, {})
+            for name in kw.get("builders", _DEFAULT)
+        }
         for name in kw.get("builders", _DEFAULT):
-            getattr(bld, 'build_'+_get(name))(app, vers, **kwa)
+            (
+                getattr(bld, 'build_'+_get(name))
+                (app, vers, **dict(kwa, **spe.get(name, {})))
+            )
 
     # pylint: disable=unnecessary-lambda
     toadd = dict(VERSION   = lambda: version(appdir()),
