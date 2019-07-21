@@ -40,8 +40,17 @@ class CondaSetup: # pylint: disable=too-many-instance-attributes
             lst = [i.strip().lower() for i in getattr(cnf, 'pinned', '').split(',')]
         self.pinned  = kwa.get('pinned', lst)
         self._conda  = kwa.get('conda',  cnf.env.CONDA)
-        if not self._conda:
-            self._conda = ['conda']
+        if not self._conda or not self._conda[0]:
+            self._conda = [os.environ.get("CONDA_EXE", None)]
+        if not self._conda[0]:
+            paths = (
+                str(Path(k)/"miniconda3"/f"{i}bin"/f"conda{j}")
+                for i in ("", "conda")
+                for j in ("", ".exe")
+                for k in (os.environ["HOME"], "/opt/code")
+            )
+            self._conda = [next((str(i) for i in paths if i.exists()), "conda")]
+
         self._nodejs = 'nodejs'
 
     @staticmethod
