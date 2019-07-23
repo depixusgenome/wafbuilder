@@ -65,7 +65,12 @@ class Modules:
         cnf.env.MODULE_SOURCE_DIR = list(self._src)
         with self.configure(cnf):
             wafbuilder.configure(cnf)
-        cnf.env.append_unique('INCLUDES',  ['../../'+i for i in self._src])
+
+        base = Path(str(cnf.path))
+        cnf.env.append_unique(
+            'INCLUDES',
+            [str((base/i).resolve()) for i in self._src if (base/i).exists()]
+        )
 
     def run_tests(self, bld, root = 'tests'):
         "runs pytests"
