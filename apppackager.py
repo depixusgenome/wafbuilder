@@ -2,9 +2,11 @@
 # encoding: utf-8
 "Everything related to conda"
 import sys
+import subprocess
+import shutil
 from pathlib import Path
 
-from waflib           import TaskGen
+from waflib           import TaskGen, Logs
 from waflib.Configure import conf
 
 from ._python         import condasetup as _condasetup
@@ -83,16 +85,21 @@ def build_doc(bld, scriptname):
         return
 
     target = str(bld.bldnode)+f"/{path}/"+scriptname
-    rule   = (
-        "${SPHINX_BUILD} "+str(bld.srcnode)+f"/{path}/{scriptname} "
-        +"-c "+str(bld.srcnode)+f"/{path} "
-        +target
-        + f" -D master_doc={scriptname} -D project={scriptname} -q"
-    )
+    def _rule(_):
+        src  = Path(str(bld.srcnode))
+        rule = (
+            f"{bld.env['SPHINX_BUILD'][0]} {src/path/scriptname} -c {src/path} {target}"
+            f" -D master_doc={scriptname} -D project={scriptname} -q"
+        )
+        out = subprocess.run(rule.split(), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+        if 'WARNING' in out.stderr.decode('utf-8'):
+            shutil.rmtree(target)
+            Logs.error(out.stderr.decode('utf-8'))
 
     tgt = bld.path.find_or_declare(target+f'/{scriptname}.html')
     bld(
-        rule   = rule,
+        rule   = _rule,
         source = (
             bld.srcnode.ant_glob(f'{path}/{scriptname}/*.rst')
             + bld.srcnode.ant_glob(path+'/conf.py')
