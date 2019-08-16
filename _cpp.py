@@ -171,7 +171,7 @@ class Flags(Make):
 
 class Boost(Make):
     u"deal with cxx/ld flags"
-    _H_ONLY = 'accumulators', 'preprocessor', 'beast'
+    _H_ONLY = 'accumulators', 'preprocessor', 'beast', 'asio'
 
     @staticmethod
     def getlibs():
