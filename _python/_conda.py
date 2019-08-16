@@ -267,9 +267,9 @@ class CondaSetup: # pylint: disable=too-many-instance-attributes
         res  = self.__currentlist()
         itms = self.reqs('python', runtimeonly = self.rtime)
         if 'cpp' in self.reqs:
-            itms.update((i[len('python_'):], j)
+            itms.update((i.replace('python_', ''), j)
                         for i, j in self.reqs('cpp', runtimeonly = self.rtime).items()
-                        if i.startswith('python_'))
+                        if i.startswith('python_') or i == 'gtest')
 
         boost = Boost.getlibs()
         if boost[0]:
