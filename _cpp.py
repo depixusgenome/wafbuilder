@@ -455,7 +455,7 @@ def build_versioncpp(bld, name, version, post):
     return [bld(
         features = 'subst',
         source   = bld.srcnode.find_resource(__package__+'/_program.template'),
-        target   = name+"_%sheader.cpp" % post,
+        target   = bld.path.get_bld().find_or_declare(name+"_%sheader.cpp" % post),
         name     = str(bld.path)+":%sheader" % post,
         nsname   = name+'_'+post,
         version  = version,
