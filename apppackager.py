@@ -65,9 +65,10 @@ def build_startupscripts(bld, name, scriptname):
     for cmdline, debug in bld.env.CMDLINES:
         args['cmdline'] = cmdline
         if iswin:
+            tgt = "_debug" if debug is True else "" if not debug else f"_{debug}"
             bld(**dict(
                 args,
-                target = bld.bldnode.find_or_declare("bin/"+name+("_debug" if debug else "")+ext),
+                target = bld.bldnode.find_or_declare("bin/"+name+tgt+ext),
                 start  = ""       if debug else r'start /min ',
                 python = "python" if debug else r'pythonw',
                 pause  = "pause"  if debug else r""
