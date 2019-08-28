@@ -364,6 +364,9 @@ def _check_cpp_python(cnf:Context, name:str, version:Optional[str]):
     if not iswin:
         line += ' -lm'
 
+    if base.endswith("-c"):
+        base = base[:-2]
+
     bases    = set(PYTHON_MODULE_LIBS.get(base, (base,)))
     fullname = "--dummy--"
     for basename in set(bases):
