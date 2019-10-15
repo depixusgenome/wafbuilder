@@ -317,8 +317,8 @@ def check_cpp_gtest(cnf:Context, name:str, version:Optional[str]):
     for i in range(3):
         inc     = path/"include"/"gtest"
         if sys.platform.startswith('win'):
-            libmain = path/"lib"/f"{name}_main.lib"
-            lib     = path/"lib"/f"{name}.lib"
+            libmain = path/"lib"/f"{name}_main-md.lib"
+            lib     = path/"lib"/f"{name}-md.lib"
         else:
             libmain = path/"lib"/f"lib{name}_main.a"
             lib     = path/"lib"/f"lib{name}.a"
@@ -334,14 +334,17 @@ def check_cpp_gtest(cnf:Context, name:str, version:Optional[str]):
     setattr(cnf.env, f"INCLUDES_{name}",  [str(inc.parent)])
     setattr(cnf.env, f"STLIBPATH_{name}", [str(lib.parent)])
     setattr(cnf.env, f"STLIB_{name}",     [i.stem.replace('lib', '') for i in (lib, libmain)])
-    setattr(cnf.env, f"LIB_{name}",       ['pthread'])
+    if sys.platform.startswith('win'):
+        setattr(cnf.env, f"DEFINES_{name}", ['GTEST_LANG_CX11=1', '_HAS_TR1_NAMESPACE=1'])
+    else:
+        setattr(cnf.env, f"LIB_{name}",       ['pthread'])
     if version is None:
         cnf.start_msg(f"Checking for conda module {name} (>= {version})")
         cnf.end_msg(True)
         return
 
     cond = 'ver >= num('+str(version).replace('.',',')+')'
-    cnf.check_python_module(base, condition = cond)
+    cnf.check_python_module(name, condition = cond)
 
 PYTHON_MODULE_LIBS = {
     'ffmpeg': ["avformat", "avcodec", "avutil"]
@@ -370,7 +373,10 @@ def _check_cpp_python(cnf:Context, name:str, version:Optional[str]):
                 for suf in ('.so', '.dll', '.lib')
         ):
             if (Path(lib) / fullname).exists():
-                line  += f' -l{basename}'
+                if sys.platform.startswith('win') and fullname.startswith('lib'):
+                    line  += f' -llib{basename}'
+                else:
+                    line  += f' -l{basename}'
                 bases -=  {basename}
                 break
 
