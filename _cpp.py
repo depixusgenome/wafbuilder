@@ -314,15 +314,19 @@ def check_cpp_gtest(cnf:Context, name:str, version:Optional[str]):
     "check for gtest"
     path = get_python_paths(cnf, name, version)['lib']
     vers = libmain = lib = inc = None
-    cnf.start_msg(f"Checking for conda module {name} (>= {version})")
     for i in range(3):
         inc     = path/"include"/"gtest"
-        libmain = path/"lib"/f"lib{name}_main.a"
-        lib     = path/"lib"/f"lib{name}.a"
+        if sys.platform.startswith('win'):
+            libmain = path/"lib"/f"{name}_main.lib"
+            lib     = path/"lib"/f"{name}.lib"
+        else:
+            libmain = path/"lib"/f"lib{name}_main.a"
+            lib     = path/"lib"/f"lib{name}.a"
         if inc.exists() and lib.exists():
             break
         path = path.parent
     else:
+        cnf.start_msg(f"Checking for conda module {name} (>= {version})")
         cnf.end_msg(False)
         cnf.fatal('Could not find the conda module ' +name)
         return
@@ -332,22 +336,12 @@ def check_cpp_gtest(cnf:Context, name:str, version:Optional[str]):
     setattr(cnf.env, f"STLIB_{name}",     [i.stem.replace('lib', '') for i in (lib, libmain)])
     setattr(cnf.env, f"LIB_{name}",       ['pthread'])
     if version is None:
+        cnf.start_msg(f"Checking for conda module {name} (>= {version})")
         cnf.end_msg(True)
         return
 
-    try:
-        ret = cnf.cmd_and_log(["conda", "list", name])
-    except Errors.WafError:
-        pass
-    else:
-        out = ret.strip().split('\n')
-        if len(out) == 4:
-            vers  = next((i for i in out[-1].split(" ")[1:] if i != ""), None)
-            cnf.end_msg(vers)
-            return
-
-    cnf.fatal('The %s version does not satisfy the requirements'%name)
-    cnf.end_msg(False)
+    cond = 'ver >= num('+str(version).replace('.',',')+')'
+    cnf.check_python_module(base, condition = cond)
 
 PYTHON_MODULE_LIBS = {
     'ffmpeg': ["avformat", "avcodec", "avutil"]
