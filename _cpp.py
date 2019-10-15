@@ -504,6 +504,7 @@ def build_gtests(bld, name, sources, **kwa):
             source = sources,
             target = f"{name}_test_all",
             name   = name + ': test_all',
+            install_path = None,
             use    = kwa.get("use", [])+["gtest"]
         ))
 
