@@ -53,6 +53,13 @@ class PyTesting:
             action  = "store_true",
         )
         grp.add_option(
+            "--pytestargs",
+            help    = f"add any pytest args between quotes",
+            dest    = "PYTEST_ARGS",
+            default = "",
+            action  = "store",
+        )
+        grp.add_option(
             "--junit",
             help    = f"Create a junit xml report at the provided path",
             dest    = "JUNIT_XML",
@@ -88,6 +95,13 @@ class PyTesting:
         cmd   = ["tests", *opt.TEST_GROUP, *junit, *cls.OPTS]
         if opt.PYTEST_V:
             cmd.append("-v")
+        if opt.PYTEST_ARGS:
+            args = opt.PYTEST_ARGS[
+                1 if opt.PYTEST_ARGS[0] in '"\'' else 0:
+                -1 if opt.PYTEST_ARGS[-1] in '"\'' else None
+            ]
+            cmd.extend(args.split())
+
         if not opt.TEST_COV:
             import_module(cls.TEST).cmdline.main(cmd)
             return
