@@ -92,7 +92,7 @@ class Modules:
         "transfer static sources"
         files = bld.path.ant_glob([i+"/**/static/*."+j
                                    for j in ("css", "js", "map", "svg", "eot",
-                                             "ttf", "woff")
+                                             "ttf", "woff", "html")
                                    for i in self._src])
         wafbuilder.copyfiles(bld, 'static', files)
 

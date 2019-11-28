@@ -19,7 +19,7 @@ def build_resources(bld):
     "install resources in installation directory"
     files = bld.path.ant_glob([i+"/**/static/*."+j
                                for j in ("css", "js", "map", "svg", "eot",
-                                         "ttf", "woff")
+                                         "ttf", "woff", "html")
                                for i in bld.env.MODULE_SOURCE_DIR])
     copyfiles(bld, 'static', files)
     bld.install_files(
